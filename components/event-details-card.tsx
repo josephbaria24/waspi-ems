@@ -57,7 +57,7 @@ export function EventDetailsCard({ event }: { event: Event }) {
               return (
                 <DropdownMenuItem
                   key={action.label}
-                  className="cursor-pointer"
+                  className="cursor-pointer "
                   onClick={async () => {
                     if (action.label === "Open Registration") {
                       if (!event.magic_link) {
@@ -74,7 +74,7 @@ export function EventDetailsCard({ event }: { event: Event }) {
                     }
                   }}
                 >
-                  <Icon className="mr-2 h-4 w-4" />
+                  <Icon className="mr-2 h-4 w-4 hover:text-white" />
                   <span>{action.label}</span>
                 </DropdownMenuItem>
               )

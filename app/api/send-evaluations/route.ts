@@ -1,13 +1,12 @@
-//app/api/send-evaluations/route.ts
-import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
-import { createClient } from "@supabase/supabase-js";
+import { NextResponse } from "next/server"
+import nodemailer from "nodemailer"
+import { createClient } from "@supabase/supabase-js"
 
 // ✅ Setup Supabase (Server-side client)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+)
 
 // ✅ Setup SMTP transporter (Hostinger)
 const transporter = nodemailer.createTransport({
@@ -18,50 +17,43 @@ const transporter = nodemailer.createTransport({
     user: "no-reply@waspi.ph",
     pass: "@Notsotrickypassword123",
   },
-});
+})
 
-// Email validation function
+// ✅ Email validation function
 function isValidEmail(email: string): boolean {
-  if (!email || typeof email !== 'string') return false;
-  
-  // Trim whitespace
-  email = email.trim();
-  
-  // Check for spaces in email
-  if (email.includes(' ')) return false;
-  
-  // Basic email regex
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
+  if (!email || typeof email !== "string") return false
+  email = email.trim()
+  if (email.includes(" ")) return false
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+  return emailRegex.test(email)
 }
 
 export async function POST(req: Request) {
   try {
     // 🧩 1. Parse request body
-    const { eventId, attendeeIds } = await req.json();
+    const { eventId, attendeeIds } = await req.json()
 
     if (!eventId) {
-      return NextResponse.json({ error: "Missing event ID" }, { status: 400 });
+      return NextResponse.json({ error: "Missing event ID" }, { status: 400 })
     }
 
     // 🧠 2. Build query dynamically
     let query = supabase
       .from("attendees")
       .select("id, personal_name, last_name, email, reference_id, hassentevaluation")
-      .eq("event_id", eventId);
+      .eq("event_id", eventId)
 
     if (Array.isArray(attendeeIds) && attendeeIds.length > 0) {
-      query = query.in("id", attendeeIds);
+      query = query.in("id", attendeeIds)
     } else {
-      query = query.eq("hassentevaluation", false);
+      query = query.eq("hassentevaluation", false)
     }
 
-    const { data: attendees, error } = await query;
+    const { data: attendees, error } = await query
 
-    if (error) throw error;
-
+    if (error) throw error
     if (!attendees?.length) {
-      return NextResponse.json({ message: "No attendees to send evaluations." });
+      return NextResponse.json({ message: "No attendees to send evaluations." })
     }
 
     // 🧩 3. Get event details
@@ -69,45 +61,50 @@ export async function POST(req: Request) {
       .from("events")
       .select("name")
       .eq("id", eventId)
-      .single();
+      .single()
+
+    // ✅ Determine base URL dynamically
+    const baseUrl =
+      process.env.NEXT_PUBLIC_SITE_URL ||
+      req.headers.get("origin") ||
+      "http://localhost:3000"
 
     // ✅ 4. Send evaluation emails with detailed tracking
-    const successful: Array<{ id: number; name: string; email: string }> = [];
-    const failed: Array<{ id: number; name: string; email: string; error: string }> = [];
+    const successful: Array<{ id: number; name: string; email: string }> = []
+    const failed: Array<{ id: number; name: string; email: string; error: string }> = []
 
     for (const attendee of attendees) {
-      const fullName = `${attendee.personal_name} ${attendee.last_name}`;
-      
+      const fullName = `${attendee.personal_name} ${attendee.last_name}`
+
       // Validate email
       if (!attendee.email) {
         failed.push({
           id: attendee.id,
           name: fullName,
           email: attendee.email || "N/A",
-          error: "Email address is missing"
-        });
-        continue;
+          error: "Email address is missing",
+        })
+        continue
       }
 
-      const cleanEmail = attendee.email.trim();
-      
+      const cleanEmail = attendee.email.trim()
       if (!isValidEmail(cleanEmail)) {
-        let errorMsg = "Invalid email format";
-        if (attendee.email.includes(' ')) {
-          errorMsg = "Email contains spaces";
+        let errorMsg = "Invalid email format"
+        if (attendee.email.includes(" ")) {
+          errorMsg = "Email contains spaces"
         }
         failed.push({
           id: attendee.id,
           name: fullName,
           email: attendee.email,
-          error: errorMsg
-        });
-        continue;
+          error: errorMsg,
+        })
+        continue
       }
 
-      // Try to send email
       try {
-        const evalLink = `https://waspi-ems.vercel.app/evaluation/${encodeURIComponent(attendee.reference_id)}`;
+        // ✅ Dynamic evaluation link (changes between dev & prod)
+        const evalLink = `${baseUrl}/evaluation/${encodeURIComponent(attendee.reference_id)}`
 
         const mailOptions = {
           from: `"WASPI" <no-reply@waspi.ph>`,
@@ -138,45 +135,40 @@ export async function POST(req: Request) {
               </div>
             </div>
           `,
-        };
+        }
 
-        await transporter.sendMail(mailOptions);
+        await transporter.sendMail(mailOptions)
 
         // 🧾 Mark attendee as "evaluation sent"
         await supabase
           .from("attendees")
           .update({ hassentevaluation: true })
-          .eq("id", attendee.id);
+          .eq("id", attendee.id)
 
         successful.push({
           id: attendee.id,
           name: fullName,
-          email: cleanEmail
-        });
-
+          email: cleanEmail,
+        })
       } catch (emailError: any) {
         failed.push({
           id: attendee.id,
           name: fullName,
           email: cleanEmail,
-          error: emailError.message || "Failed to send email"
-        });
+          error: emailError.message || "Failed to send email",
+        })
       }
     }
 
     return NextResponse.json({
       message: "✅ Email sending process completed.",
-      result: {
-        successful,
-        failed
-      }
-    });
-
+      result: { successful, failed },
+    })
   } catch (error) {
-    console.error("❌ Send Evaluations Error:", error);
+    console.error("❌ Send Evaluations Error:", error)
     return NextResponse.json(
       { error: "Failed to send evaluations" },
       { status: 500 }
-    );
+    )
   }
 }
