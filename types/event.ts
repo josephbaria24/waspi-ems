@@ -1,6 +1,7 @@
 export type Event = {
   id: string
   name: string
+  description?: string
   type: string
   price: number
   venue: string

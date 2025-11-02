@@ -1,3 +1,4 @@
+//components\register-page.tsx
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
@@ -9,7 +10,7 @@ import { Label } from "@/components/ui/label"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Loader2, CheckCircle2, Upload, Edit2, X, Crop } from "lucide-react"
+import { Loader2, CheckCircle2, Upload, Edit2, X, Crop, UserCog } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 
 interface CropArea {
@@ -27,6 +28,7 @@ interface EventData {
   start_date: string
   end_date: string
   feature_image?: string
+  description?: string
 }
 
 export default function RegisterPage() {
@@ -85,7 +87,7 @@ export default function RegisterPage() {
       
       const { data, error } = await supabase
         .from("events")
-        .select("id, name, price, venue, start_date, end_date, feature_image")
+        .select("id, name, price, venue, start_date, end_date, feature_image, description")
         .eq("magic_link", ref)
         .single()
 
@@ -520,7 +522,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-[#017C7C]/90 p-4 sm:p-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-emerald-500 p-4 sm:p-8">
       {showCropModal && imageToCrop && (
         <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
           <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto">
@@ -587,8 +589,8 @@ export default function RegisterPage() {
       )}
 
       {isAdmin && (
-        <div className="w-full max-w-2xl mb-4 bg-yellow-500 text-black px-4 py-2 rounded-lg flex items-center justify-between">
-          <span className="font-semibold">👤 Admin Mode</span>
+        <div className="w-full max-w-2xl mb-4 bg-yellow-500 border-2 text-black px-4 py-2 rounded-lg flex items-center justify-between">
+          <span className="font-semibold flex gap-2"><UserCog/> Admin Mode</span>
         </div>
       )}
       
@@ -662,6 +664,11 @@ export default function RegisterPage() {
           <div className="flex items-start justify-between">
             <div className="flex-1">
               <CardTitle className="text-3xl">{event.name}</CardTitle>
+              {event.description && (
+                <p className="text-base text-muted-foreground mt-2 whitespace-pre-wrap">
+                  {event.description}
+                </p>
+              )}
               <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
                 <p>
                   {new Date(event.start_date).toLocaleDateString()} –{" "}

@@ -1,13 +1,15 @@
-// Updated AttendeesList with Attendance per Day Toggle Feature and Edit Modal
+// Updated AttendeesList with Quick Actions Feature
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, Search, Pencil } from "lucide-react"
+import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { supabase } from "@/lib/supabase-client"
 
 interface Attendee {
@@ -24,11 +26,14 @@ interface Attendee {
   company?: string
   position?: string
   company_address?: string
+  payment_status?: string
 }
 
 interface EventScheduleDate {
   date: string // ISO format e.g. "2025-11-06"
 }
+
+type QuickActionMode = "payment" | "attendance" | null
 
 export function AttendeesList({ eventId, scheduleDates }: { eventId: string; scheduleDates: EventScheduleDate[] }) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -36,6 +41,11 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
   const [editingAttendee, setEditingAttendee] = useState<Attendee | null>(null)
   const [editForm, setEditForm] = useState<Partial<Attendee>>({})
   const [saving, setSaving] = useState(false)
+  
+  // Quick Actions State
+  const [quickActionMode, setQuickActionMode] = useState<QuickActionMode>(null)
+  const [selectedIds, setSelectedIds] = useState<number[]>([])
+  const [selectedDate, setSelectedDate] = useState<string>("")
 
   useEffect(() => {
     const fetchAttendees = async () => {
@@ -59,7 +69,8 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
             address: a.address,
             company: a.company,
             position: a.position,
-            company_address: a.company_address
+            company_address: a.company_address,
+            payment_status: a.payment_status || "Pending"
           }))
         )
       }
@@ -97,6 +108,21 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
         a.id === attendeeId ? { ...a, attendance: updatedAttendance } : a
       )
     )
+  }
+
+  const updatePaymentStatus = async (attendeeId: number, status: string) => {
+    const { error } = await supabase
+      .from("attendees")
+      .update({ payment_status: status })
+      .eq("id", attendeeId)
+
+    if (!error) {
+      setAttendees((prev) =>
+        prev.map((a) =>
+          a.id === attendeeId ? { ...a, payment_status: status } : a
+        )
+      )
+    }
   }
 
   const handleEditClick = (attendee: Attendee) => {
@@ -137,7 +163,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
         .eq("id", editingAttendee.id)
 
       if (!error) {
-        // Update local state
         setAttendees((prev) =>
           prev.map((a) =>
             a.id === editingAttendee.id
@@ -161,6 +186,119 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       setSaving(false)
     }
   }
+
+  // Quick Actions Functions
+  const handleQuickActionSelect = (mode: QuickActionMode) => {
+    setQuickActionMode(mode)
+    setSelectedIds([])
+    if (mode === "attendance" && scheduleDates.length > 0) {
+      setSelectedDate(scheduleDates[0].date)
+    }
+  }
+
+  const handleCancelQuickAction = () => {
+    setQuickActionMode(null)
+    setSelectedIds([])
+    setSelectedDate("")
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.length === filteredAttendees.length) {
+      setSelectedIds([])
+    } else {
+      setSelectedIds(filteredAttendees.map(a => a.id))
+    }
+  }
+
+  const toggleSelectAttendee = (id: number) => {
+    setSelectedIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
+  }
+
+  const executeQuickAction = async () => {
+    if (selectedIds.length === 0) {
+      alert("Please select at least one attendee")
+      return
+    }
+
+    if (quickActionMode === "payment") {
+      // Mark as Fully Paid
+      const updates = selectedIds.map(id => 
+        supabase
+          .from("attendees")
+          .update({ payment_status: "Fully Paid" })
+          .eq("id", id)
+      )
+      
+      await Promise.all(updates)
+      
+      setAttendees(prev =>
+        prev.map(a =>
+          selectedIds.includes(a.id) ? { ...a, payment_status: "Fully Paid" } : a
+        )
+      )
+      
+      alert(`✅ Marked ${selectedIds.length} attendee(s) as Fully Paid`)
+    } else if (quickActionMode === "attendance" && selectedDate) {
+      // Mark as Present for selected date
+      const epochDate = new Date(selectedDate).getTime()
+      
+      const updates = selectedIds.map(async (id) => {
+        const attendee = attendees.find(a => a.id === id)
+        if (!attendee) return
+        
+        const existing = attendee.attendance.find(a => a.date === epochDate)
+        let updatedAttendance = [...attendee.attendance]
+        
+        if (!existing) {
+          updatedAttendance.push({ date: epochDate, status: "Present" })
+        } else {
+          updatedAttendance = updatedAttendance.map(a =>
+            a.date === epochDate ? { ...a, status: "Present" } : a
+          )
+        }
+        
+        return supabase
+          .from("attendees")
+          .update({ attendance: updatedAttendance })
+          .eq("id", id)
+      })
+      
+      await Promise.all(updates)
+      
+      // Refresh attendees
+      const { data } = await supabase
+        .from("attendees")
+        .select("*")
+        .eq("event_id", parseInt(eventId))
+      
+      if (data) {
+        setAttendees(
+          data.map((a: any) => ({
+            id: a.id,
+            name: `${a.personal_name ?? ""} ${a.last_name ?? ""}`.trim(),
+            email: a.email ?? "",
+            attendance: a.attendance || [],
+            personal_name: a.personal_name,
+            middle_name: a.middle_name,
+            last_name: a.last_name,
+            mobile_number: a.mobile_number,
+            date_of_birth: a.date_of_birth,
+            address: a.address,
+            company: a.company,
+            position: a.position,
+            company_address: a.company_address,
+            payment_status: a.payment_status || "Pending"
+          }))
+        )
+      }
+      
+      alert(`✅ Marked ${selectedIds.length} attendee(s) as Present`)
+    }
+    
+    handleCancelQuickAction()
+  }
   
   const filteredAttendees = attendees
     .filter((attendee) => {
@@ -179,31 +317,139 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     return record?.status ?? "Pending"
   }
 
+  const getPaymentStatusColor = (status?: string) => {
+    switch (status) {
+      case "Fully Paid":
+        return "bg-green-100 text-green-700 border-green-300"
+      case "Partially Paid":
+        return "bg-yellow-100 text-yellow-700 border-yellow-300"
+      case "Pending":
+      default:
+        return "bg-gray-100 text-gray-700 border-gray-300"
+    }
+  }
+
   return (
     <>
       <Card>
         <CardHeader>
-          <CardTitle>Attendance Details</CardTitle>
-          <div className="flex items-center gap-4">
-            <CardDescription>
-              Showing: {filteredAttendees.length} Results
-            </CardDescription>
-            <Input
-              type="text"
-              placeholder="Search by attendee..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-64"
-            />
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Attendance Details</CardTitle>
+              <div className="flex items-center gap-4 mt-2">
+                <CardDescription>
+                  Showing: {filteredAttendees.length} Results
+                </CardDescription>
+                <Input
+                  type="text"
+                  placeholder="Search by attendee..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-64"
+                />
+              </div>
+            </div>
+            
+            {/* Quick Actions Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="gap-2">
+                  <Zap className="h-4 w-4" />
+                  Quick Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => handleQuickActionSelect("payment")}>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Mark as Fully Paid
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handleQuickActionSelect("attendance")}>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Mark as Present
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
+
+          {/* Quick Action Bar */}
+          {quickActionMode && (
+            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+              <div className="flex items-center justify-between gap-4">
+                <div className="flex items-center gap-4 flex-1">
+                  <div className="flex items-center gap-2">
+                    <Zap className="h-5 w-5 text-blue-600" />
+                    <span className="font-semibold text-blue-900">
+                      {quickActionMode === "payment" ? "Quick Mark as Fully Paid" : "Quick Mark as Present"}
+                    </span>
+                  </div>
+                  
+                  {quickActionMode === "attendance" && (
+                    <Select value={selectedDate} onValueChange={setSelectedDate}>
+                      <SelectTrigger className="w-[250px] bg-white">
+                        <SelectValue placeholder="Select date" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {scheduleDates.map((d) => (
+                          <SelectItem key={d.date} value={d.date}>
+                            {new Date(d.date).toLocaleDateString(undefined, {
+                              weekday: "long",
+                              month: "long",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  
+                  <span className="text-sm text-blue-700">
+                    {selectedIds.length} selected
+                  </span>
+                </div>
+                
+                <div className="flex items-center gap-2">
+                  <Button 
+                    size="sm" 
+                    onClick={executeQuickAction}
+                    disabled={selectedIds.length === 0 || (quickActionMode === "attendance" && !selectedDate)}
+                  >
+                    Apply to {selectedIds.length} attendee(s)
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="outline" 
+                    onClick={handleCancelQuickAction}
+                  >
+                    <X className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}
         </CardHeader>
+        
         <CardContent>
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto border rounded-lg">
             <table className="min-w-full text-sm relative">
               <thead className="sticky top-0 bg-background z-10 border-b">
                 <tr>
-                  <th className="text-left py-3 px-3 font-semibold sticky left-0 bg-background">Attendee</th>
-                  <th className="text-center py-3 px-3 font-semibold bg-background">Actions</th>
+                  {quickActionMode && (
+                    <th className="text-left py-3 px-3 font-semibold sticky left-0 bg-background z-20">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.length === filteredAttendees.length && filteredAttendees.length > 0}
+                        onChange={toggleSelectAll}
+                        className="cursor-pointer"
+                      />
+                    </th>
+                  )}
+                   <th className="text-center py-3 px-3 font-semibold bg-background">Actions</th>
+                  <th className={`text-left py-3 px-3 font-semibold bg-background ${quickActionMode ? '' : 'sticky left-0 z-20'}`}>
+                    Attendee
+                  </th>
+                  <th className="text-center py-3 px-3 font-semibold bg-background">Payment Status</th>
+                 
                   {scheduleDates.map((d) => (
                     <th key={d.date} className="text-left py-3 px-3 font-semibold bg-background">
                       {new Date(d.date).toLocaleDateString(undefined, {
@@ -219,24 +465,68 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
               <tbody>
                 {filteredAttendees.map((attendee) => (
                   <tr key={attendee.id} className="border-b hover:bg-muted/50">
-                    <td className="px-3 py-3 font-medium sticky left-0 bg-background">
-                      {attendee.name}
-                    </td>
+                    {quickActionMode && (
+                      <td className="px-3 py-3 sticky left-0 bg-background z-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(attendee.id)}
+                          onChange={() => toggleSelectAttendee(attendee.id)}
+                          className="cursor-pointer"
+                        />
+                      </td>
+                    )}
                     <td className="px-3 py-3 text-center bg-background">
                       <Button
                         variant="ghost"
                         size="icon"
                         onClick={() => handleEditClick(attendee)}
                         className="h-8 w-8"
+                        disabled={quickActionMode !== null}
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
                     </td>
+                    <td className={`px-3 py-3 font-medium bg-background ${quickActionMode ? '' : 'sticky left-0'}`}>
+                      {attendee.name}
+                    </td>
+                    <td className="px-3 py-3 text-center bg-background">
+                      <Select
+                        value={attendee.payment_status || "Pending"}
+                        onValueChange={(value) => updatePaymentStatus(attendee.id, value)}
+                        disabled={quickActionMode !== null}
+                      >
+                        <SelectTrigger className={`w-[140px] mx-auto text-xs ${getPaymentStatusColor(attendee.payment_status)}`}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Pending">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3 w-3" />
+                              Pending
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Partially Paid">
+                            <div className="flex items-center gap-2">
+                              <TrendingUp className="h-3 w-3" />
+                              Partially Paid
+                            </div>
+                          </SelectItem>
+                          <SelectItem value="Fully Paid">
+                            <div className="flex items-center gap-2">
+                              <CheckCircle2 className="h-3 w-3" />
+                              Fully Paid
+                            </div>
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </td>
+                    
                     {scheduleDates.map((d) => (
                       <td key={d.date} className="px-3 py-3">
                         <Button
                           variant="ghost"
                           onClick={() => toggleAttendance(attendee.id, d.date)}
+                          disabled={quickActionMode !== null}
                           className={`rounded-full px-3 py-1 border text-xs cursor-pointer ${
                             getStatusDisplay(attendee, d.date) === "Present"
                               ? "bg-green-100 text-green-700 hover:bg-green-200"

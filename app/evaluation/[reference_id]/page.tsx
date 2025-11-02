@@ -1,4 +1,3 @@
-//app/evaluation/[reference_id]/page.tsx
 "use client"
 
 import { useEffect, useState } from "react"
@@ -22,6 +21,8 @@ const ratingQuestions = [
   "The presenters responded to questions.",
   "I would recommend others to join future events by Petrosphere and its partner(s)."
 ]
+
+const ratingLabels = ["Strongly Disagree", "Disagree", "Neutral", "Agree", "Strongly Agree"]
 
 export default function EvaluationPage() {
   const params = useParams()
@@ -242,24 +243,25 @@ export default function EvaluationPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-100 to-blue-200 py-8 px-4">
-      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-6">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-100 to-blue-200 py-4 sm:py-8 px-4">
+      <form onSubmit={handleSubmit} className="max-w-3xl mx-auto space-y-4 sm:space-y-6">
         {/* Header */}
-        <div className="bg-white rounded-xl shadow-md p-8">
-          <h1 className="text-3xl font-bold text-gray-800 mb-2">Event Evaluation Form</h1>
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-8">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-800 mb-2">Event Evaluation Form</h1>
           <p className="text-gray-600">
             {attendee?.personal_name} {attendee?.last_name}
           </p>
-          <p className="text-lg font-medium text-gray-700 mt-4">{event?.name}</p>
+          <p className="text-base sm:text-lg font-medium text-gray-700 mt-4">{event?.name}</p>
         </div>
 
         {/* Overall Rating */}
-        <div className="bg-white rounded-xl shadow-md p-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-6">
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-8">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4 sm:mb-6">
             Overall, how do you rate the event?
           </h3>
           <RadioGroup value={overallRating} onValueChange={setOverallRating}>
-            <div className="flex justify-between items-center">
+            {/* Desktop Layout */}
+            <div className="hidden sm:flex justify-between items-center">
               <span className="text-sm text-gray-600">Very poor</span>
               <div className="flex gap-8">
                 {[1, 2, 3, 4, 5].map((value) => (
@@ -275,18 +277,39 @@ export default function EvaluationPage() {
               </div>
               <span className="text-sm text-gray-600">Excellent</span>
             </div>
+
+            {/* Mobile Layout */}
+            <div className="flex sm:hidden flex-col gap-3">
+              <div className="flex justify-between text-xs text-gray-600 mb-2">
+                <span>Very poor</span>
+                <span>Excellent</span>
+              </div>
+              <div className="flex justify-between">
+                {[1, 2, 3, 4, 5].map((value) => (
+                  <div key={value} className="flex flex-col items-center gap-2">
+                    <span className="text-sm font-medium">{value}</span>
+                    <RadioGroupItem 
+                      value={value.toString()} 
+                      id={`overall-mobile-${value}`}
+                      className="h-6 w-6 border-2 border-gray-500"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
           </RadioGroup>
         </div>
 
         {/* Rating Questions */}
-        <div className="bg-white rounded-xl shadow-md p-8">
-          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-8">
+          <h3 className="text-base sm:text-lg font-semibold text-gray-800 mb-4">
             Please rate your satisfaction with the content of the webinar by indicating your level
             of agreement or disagreement with each of the following statements.
           </h3>
 
           <div className="space-y-6">
-            <div className="grid grid-cols-[1fr_repeat(5,100px)] gap-4 text-sm font-medium text-gray-700 border-b pb-3">
+            {/* Desktop Table Header */}
+            <div className="hidden lg:grid grid-cols-[1fr_repeat(5,100px)] gap-4 text-sm font-medium text-gray-700 border-b pb-3">
               <div></div>
               <div className="text-center">Strongly<br/>Disagree</div>
               <div className="text-center">Disagree</div>
@@ -297,12 +320,13 @@ export default function EvaluationPage() {
 
             {ratingQuestions.map((question, index) => (
               <div key={index} className="border-b pb-4 last:border-b-0">
-                <div className="text-sm text-gray-700 mb-3">{question}</div>
+                <div className="text-sm text-gray-700 mb-3 font-medium">{question}</div>
                 <RadioGroup
                   value={ratings[index] || ""}
                   onValueChange={(value) => setRatings({ ...ratings, [index]: value })}
                 >
-                  <div className="grid grid-cols-[1fr_repeat(5,100px)] gap-4">
+                  {/* Desktop Layout */}
+                  <div className="hidden lg:grid grid-cols-[1fr_repeat(5,100px)] gap-4">
                     <div></div>
                     {["1", "2", "3", "4", "5"].map((value) => (
                       <div key={value} className="flex justify-center">
@@ -314,6 +338,25 @@ export default function EvaluationPage() {
                       </div>
                     ))}
                   </div>
+
+                  {/* Mobile/Tablet Layout */}
+                  <div className="lg:hidden space-y-2">
+                    {["1", "2", "3", "4", "5"].map((value, i) => (
+                      <div key={value} className="flex items-center gap-3 py-2">
+                        <RadioGroupItem 
+                          value={value} 
+                          id={`q${index}-mobile-${value}`}
+                          className="h-5 w-5 border-2 border-gray-500 flex-shrink-0"
+                        />
+                        <Label 
+                          htmlFor={`q${index}-mobile-${value}`}
+                          className="text-sm cursor-pointer"
+                        >
+                          {ratingLabels[i]}
+                        </Label>
+                      </div>
+                    ))}
+                  </div>
                 </RadioGroup>
               </div>
             ))}
@@ -321,9 +364,9 @@ export default function EvaluationPage() {
         </div>
 
         {/* Open-ended Questions */}
-        <div className="bg-white rounded-xl shadow-md p-8 space-y-6">
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-8 space-y-6">
           <div>
-            <Label htmlFor="likeMost" className="text-base font-semibold text-gray-800 mb-3 block">
+            <Label htmlFor="likeMost" className="text-sm sm:text-base font-semibold text-gray-800 mb-3 block">
               What did you like MOST about the event?
             </Label>
             <Textarea
@@ -336,7 +379,7 @@ export default function EvaluationPage() {
           </div>
 
           <div>
-            <Label htmlFor="likeLeast" className="text-base font-semibold text-gray-800 mb-3 block">
+            <Label htmlFor="likeLeast" className="text-sm sm:text-base font-semibold text-gray-800 mb-3 block">
               What did you like LEAST about the event?
             </Label>
             <Textarea
@@ -349,7 +392,7 @@ export default function EvaluationPage() {
           </div>
 
           <div>
-            <Label htmlFor="futureTopic" className="text-base font-semibold text-gray-800 mb-3 block">
+            <Label htmlFor="futureTopic" className="text-sm sm:text-base font-semibold text-gray-800 mb-3 block">
               Suggest a future topic for event you would like to attend.
             </Label>
             <Textarea
@@ -362,7 +405,7 @@ export default function EvaluationPage() {
           </div>
 
           <div>
-            <Label htmlFor="comments" className="text-base font-semibold text-gray-800 mb-3 block">
+            <Label htmlFor="comments" className="text-sm sm:text-base font-semibold text-gray-800 mb-3 block">
               Do you have any additional comments about the webinar?
             </Label>
             <Textarea
@@ -376,8 +419,8 @@ export default function EvaluationPage() {
         </div>
 
         {/* Mailing List */}
-        <div className="bg-white rounded-xl shadow-md p-8">
-          <h3 className="text-base font-semibold text-gray-800 mb-4">
+        <div className="bg-white rounded-xl shadow-md p-4 sm:p-8">
+          <h3 className="text-sm sm:text-base font-semibold text-gray-800 mb-4">
             I am interested in attending future events offered by Petrosphere and its partner(s).
             Please include me in the mailing list.
           </h3>
@@ -389,7 +432,7 @@ export default function EvaluationPage() {
                   id="mailing-yes"
                   className="h-5 w-5 border-2 border-gray-500"
                 />
-                <Label htmlFor="mailing-yes">Yes</Label>
+                <Label htmlFor="mailing-yes" className="cursor-pointer">Yes</Label>
               </div>
               <div className="flex items-center space-x-2">
                 <RadioGroupItem 
@@ -397,18 +440,18 @@ export default function EvaluationPage() {
                   id="mailing-no"
                   className="h-5 w-5 border-2 border-gray-500"
                 />
-                <Label htmlFor="mailing-no">No</Label>
+                <Label htmlFor="mailing-no" className="cursor-pointer">No</Label>
               </div>
             </div>
           </RadioGroup>
         </div>
 
         {/* Submit Button */}
-        <div className="flex justify-center pb-8">
+        <div className="flex justify-center pb-4 sm:pb-8">
           <Button
             type="submit"
             disabled={submitting}
-            className="bg-indigo-900 hover:bg-indigo-800 text-white px-12 py-6 text-lg rounded-lg"
+            className="bg-indigo-900 hover:bg-indigo-800 text-white px-8 sm:px-12 py-4 sm:py-6 text-base sm:text-lg rounded-lg w-full sm:w-auto"
           >
             {submitting ? (
               <>

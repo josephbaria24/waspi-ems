@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, XCircle, Loader2 } from "lucide-react"
+import { CheckCircle2, XCircle, Loader2, Clock, TrendingUp } from "lucide-react"
 
 interface SendEvaluationsModalProps {
   eventId: number
@@ -19,8 +19,17 @@ interface SendResult {
   failed: Array<{ id: number; name: string; email: string; error: string }>
 }
 
+interface Attendee {
+  id: number
+  personal_name: string
+  last_name: string
+  email: string
+  hassentevaluation: boolean
+  payment_status?: string
+}
+
 export default function SendEvaluationsModal({ eventId, open, onClose, supabase }: SendEvaluationsModalProps) {
-  const [attendees, setAttendees] = useState<any[]>([])
+  const [attendees, setAttendees] = useState<Attendee[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -34,7 +43,7 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
       setLoading(true)
       const { data, error } = await supabase
         .from("attendees")
-        .select("id, personal_name, last_name, email, hassentevaluation")
+        .select("id, personal_name, last_name, email, hassentevaluation, payment_status")
         .eq("event_id", eventId)
       if (!error && data) setAttendees(data)
       setLoading(false)
@@ -99,9 +108,38 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
     onClose()
   }
 
+  const getPaymentStatusBadge = (status?: string) => {
+    const statusValue = status || "Pending"
+    
+    switch (statusValue) {
+      case "Fully Paid":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-700 border border-green-300">
+            <CheckCircle2 className="h-3 w-3" />
+            Paid
+          </span>
+        )
+      case "Partially Paid":
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-700 border border-yellow-300">
+            <TrendingUp className="h-3 w-3" />
+            Partial
+          </span>
+        )
+      case "Pending":
+      default:
+        return (
+          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
+            <Clock className="h-3 w-3" />
+            Pending
+          </span>
+        )
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-3xl max-h-[80vh] flex flex-col rounded-xl">
+      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col rounded-xl">
         <DialogHeader>
           <DialogTitle>Send Evaluations</DialogTitle>
         </DialogHeader>
@@ -204,33 +242,57 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
             )}
 
             {/* Scrollable attendee list */}
-            <div className="flex-1 overflow-y-auto border rounded-lg divide-y min-h-0">
+            <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
+              {/* Table Header */}
+              <div className="sticky top-0 bg-gray-50 border-b font-semibold text-sm">
+                <div className="grid grid-cols-12 gap-4 px-4 py-3">
+                  <div className="col-span-1 flex items-center">
+                    <span className="sr-only">Checkbox</span>
+                  </div>
+                  <div className="col-span-5">Name</div>
+                  <div className="col-span-4">Email</div>
+                  <div className="col-span-2 text-center">Payment</div>
+                </div>
+              </div>
+
+              {/* Table Body */}
               {filteredAttendees.length === 0 ? (
                 <div className="px-4 py-8 text-center text-gray-500">
                   No attendees found
                 </div>
               ) : (
-                filteredAttendees.map((a, i) => (
-                  <div
-                    key={a.id}
-                    className="flex items-center justify-between px-4 py-3 hover:bg-gray-50"
-                  >
-                    <div className="flex items-center gap-3">
-                      <input
-                        type="checkbox"
-                        checked={selectedIds.includes(a.id)}
-                        onChange={() => toggleSelect(a.id)}
-                        disabled={sending}
-                      />
-                      <span className="font-medium">
-                        {i + 1}. {a.last_name}, {a.personal_name}
-                      </span>
+                <div className="divide-y">
+                  {filteredAttendees.map((a, i) => (
+                    <div
+                      key={a.id}
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 items-center"
+                    >
+                      <div className="col-span-1 flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(a.id)}
+                          onChange={() => toggleSelect(a.id)}
+                          disabled={sending}
+                          className="cursor-pointer"
+                        />
+                        <span className="text-sm text-gray-500">{i + 1}</span>
+                      </div>
+                      <div className="col-span-5">
+                        <span className="font-medium">
+                          {a.last_name}, {a.personal_name}
+                        </span>
+                      </div>
+                      <div className="col-span-4">
+                        <span className="text-sm text-gray-600 truncate block">
+                          {a.email || <span className="text-red-500 italic">No email</span>}
+                        </span>
+                      </div>
+                      <div className="col-span-2 flex justify-center">
+                        {getPaymentStatusBadge(a.payment_status)}
+                      </div>
                     </div>
-                    <span className="text-sm text-gray-600 truncate max-w-[220px]">
-                      {a.email || <span className="text-red-500 italic">No email</span>}
-                    </span>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </div>
 

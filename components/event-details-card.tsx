@@ -1,4 +1,6 @@
 //components/event-details-card.tsx
+// Note: Import Textarea from your UI components
+// import { Textarea } from "@/components/ui/textarea"
 "use client"
 
 import { useState } from "react"
@@ -6,21 +8,40 @@ import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPl
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Textarea } from "@/components/ui/textarea"
 import type { Event } from "@/types/event"
 import SendEvaluationsModal from "@/components/send-evaluation-modal"
 import CertificateTemplateModal from "@/components/certificate-template-modal"
+import ExportAttendeesModal from "@/components/export-attendees-modal"
 import { supabase } from "@/lib/supabase-client"
 
 export function EventDetailsCard({ event }: { event: Event }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedEvent, setEditedEvent] = useState(event)
   const [topicInput, setTopicInput] = useState("")
-  const handleSave = () => {
-    setIsEditing(false)
+  const handleSave = async () => {
+    // Update the description in the database
+    const { error } = await supabase
+      .from('events')
+      .update({ 
+        name: editedEvent.name,
+        venue: editedEvent.venue,
+        price: editedEvent.price,
+        description: editedEvent.description
+      })
+      .eq('id', event.id)
+    
+    if (error) {
+      console.error('Error updating event:', error)
+      alert('Failed to save changes')
+    } else {
+      setIsEditing(false)
+    }
   }
   const [showRegistrationForm, setShowRegistrationForm] = useState(false);
   const [showSendEvaluationsModal, setShowSendEvaluationsModal] = useState(false)
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
+  const [showExportModal, setShowExportModal] = useState(false)
 
   const actions = [
     { label: "Open Registration", icon: UserPlus },
@@ -72,6 +93,9 @@ export function EventDetailsCard({ event }: { event: Event }) {
                     if (action.label === "Send Evaluations") {
                       setShowSendEvaluationsModal(true)
                     }
+                    if (action.label === "Export Attendees") {
+                      setShowExportModal(true)
+                    }
                   }}
                 >
                   <Icon className="mr-2 h-4 w-4 hover:text-white" />
@@ -95,6 +119,16 @@ export function EventDetailsCard({ event }: { event: Event }) {
                   value={editedEvent.name}
                   onChange={(e) => setEditedEvent({ ...editedEvent, name: e.target.value })}
                   className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                <Textarea
+                  value={editedEvent.description || ""}
+                  onChange={(e) => setEditedEvent({ ...editedEvent, description: e.target.value })}
+                  placeholder="Enter event description..."
+                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[100px]"
                 />
               </div>
 
@@ -140,6 +174,13 @@ export function EventDetailsCard({ event }: { event: Event }) {
                 <p className="text-sm font-medium text-muted-foreground">Event Name</p>
                 <p className="text-lg font-semibold text-foreground">{editedEvent.name}</p>
               </div>
+
+              {editedEvent.description && (
+                <div>
+                  <p className="text-sm font-medium text-muted-foreground">Description</p>
+                  <p className="text-foreground whitespace-pre-wrap">{editedEvent.description}</p>
+                </div>
+              )}
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
@@ -312,6 +353,13 @@ export function EventDetailsCard({ event }: { event: Event }) {
         eventId={Number(event.id)}
         open={showTemplateEditor}
         onClose={() => setShowTemplateEditor(false)}
+      />
+
+      <ExportAttendeesModal
+        eventId={Number(event.id)}
+        eventName={event.name}
+        open={showExportModal}
+        onClose={() => setShowExportModal(false)}
       />
     </Card>
   )
