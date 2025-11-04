@@ -259,7 +259,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
           continue
         }
 
-        const submissionLink = `${window.location.origin}/submission/${attendee.reference_id}`
+        const submissionLink = `${window.location.origin}/submission/${encodeURIComponent(attendee.reference_id)}`
 
         const response = await fetch("/api/send-confirmation", {
           method: "POST",
