@@ -1,8 +1,8 @@
-// Updated AttendeesList with Quick Actions Feature
+// Updated AttendeesList with Quick Actions Feature + Email Confirmation
 "use client"
 
 import { useEffect, useState } from "react"
-import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X } from "lucide-react"
+import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -10,6 +10,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { Progress } from "@/components/ui/progress"
+import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase-client"
 
 interface Attendee {
@@ -33,7 +35,14 @@ interface EventScheduleDate {
   date: string // ISO format e.g. "2025-11-06"
 }
 
-type QuickActionMode = "payment" | "attendance" | null
+type QuickActionMode = "payment" | "attendance" | "email" | null
+
+interface EmailResult {
+  name: string
+  email: string
+  status: "success" | "error" | "skipped"
+  error?: string
+}
 
 export function AttendeesList({ eventId, scheduleDates }: { eventId: string; scheduleDates: EventScheduleDate[] }) {
   const [searchQuery, setSearchQuery] = useState("")
@@ -46,6 +55,12 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
   const [quickActionMode, setQuickActionMode] = useState<QuickActionMode>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectedDate, setSelectedDate] = useState<string>("")
+  
+  // Email Sending State
+  const [isSendingEmails, setIsSendingEmails] = useState(false)
+  const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 })
+  const [emailResults, setEmailResults] = useState<EmailResult[]>([])
+  const [showEmailResults, setShowEmailResults] = useState(false)
 
   useEffect(() => {
     const fetchAttendees = async () => {
@@ -187,10 +202,105 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     }
   }
 
+  // Email Validation
+  const isValidEmail = (email: string): boolean => {
+    const trimmed = email.trim()
+    if (!trimmed || trimmed !== email) return false // Has whitespace
+    const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    return regex.test(trimmed)
+  }
+
+  // Send Confirmation Emails
+  const sendConfirmationEmails = async () => {
+    if (selectedIds.length === 0) {
+      alert("Please select at least one attendee")
+      return
+    }
+
+    const selectedAttendees = attendees.filter(a => selectedIds.includes(a.id))
+    const results: EmailResult[] = []
+
+    setIsSendingEmails(true)
+    setEmailProgress({ current: 0, total: selectedAttendees.length })
+    setEmailResults([])
+
+    // Get event details (you'll need to pass these as props or fetch them)
+    // For now, using placeholder values
+    const eventName = "Event Name" // TODO: Pass as prop
+    const venue = "Event Venue" // TODO: Pass as prop
+
+    for (let i = 0; i < selectedAttendees.length; i++) {
+      const attendee = selectedAttendees[i]
+      
+      // Validate email
+      if (!isValidEmail(attendee.email)) {
+        results.push({
+          name: attendee.name,
+          email: attendee.email,
+          status: "skipped",
+          error: "Invalid email format or contains whitespace"
+        })
+        setEmailProgress({ current: i + 1, total: selectedAttendees.length })
+        continue
+      }
+
+      try {
+        // Generate reference ID and submission link
+        const referenceId = `REF-${attendee.id}-${Date.now()}`
+        const submissionLink = `${window.location.origin}/submission/${referenceId}`
+
+        const response = await fetch("/api/send-confirmation", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            email: attendee.email,
+            name: attendee.name,
+            reference_id: referenceId,
+            event_name: eventName,
+            venue: venue,
+            link: submissionLink
+          })
+        })
+
+        const data = await response.json()
+
+        if (data.success) {
+          results.push({
+            name: attendee.name,
+            email: attendee.email,
+            status: "success"
+          })
+        } else {
+          results.push({
+            name: attendee.name,
+            email: attendee.email,
+            status: "error",
+            error: data.error || "Unknown error"
+          })
+        }
+      } catch (error: any) {
+        results.push({
+          name: attendee.name,
+          email: attendee.email,
+          status: "error",
+          error: error.message || "Network error"
+        })
+      }
+
+      setEmailProgress({ current: i + 1, total: selectedAttendees.length })
+      setEmailResults([...results])
+    }
+
+    setIsSendingEmails(false)
+    setShowEmailResults(true)
+  }
+
   // Quick Actions Functions
   const handleQuickActionSelect = (mode: QuickActionMode) => {
     setQuickActionMode(mode)
     setSelectedIds([])
+    setShowEmailResults(false)
+    setEmailResults([])
     if (mode === "attendance" && scheduleDates.length > 0) {
       setSelectedDate(scheduleDates[0].date)
     }
@@ -200,6 +310,8 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     setQuickActionMode(null)
     setSelectedIds([])
     setSelectedDate("")
+    setShowEmailResults(false)
+    setEmailResults([])
   }
 
   const toggleSelectAll = () => {
@@ -219,6 +331,11 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
   const executeQuickAction = async () => {
     if (selectedIds.length === 0) {
       alert("Please select at least one attendee")
+      return
+    }
+
+    if (quickActionMode === "email") {
+      await sendConfirmationEmails()
       return
     }
 
@@ -329,6 +446,10 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     }
   }
 
+  const successCount = emailResults.filter(r => r.status === "success").length
+  const errorCount = emailResults.filter(r => r.status === "error").length
+  const skippedCount = emailResults.filter(r => r.status === "skipped").length
+
   return (
     <>
       <Card>
@@ -365,6 +486,10 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => handleQuickActionSelect("email")}>
+                    <Mail className="h-4 w-4 mr-2" />
+                    Send Confirmation Emails
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={() => handleQuickActionSelect("payment")}>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
                     Mark as Fully Paid
@@ -387,7 +512,11 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Zap className="h-5 w-5 text-blue-600 flex-shrink-0" />
                     <span className="font-semibold text-blue-900 text-sm sm:text-base truncate">
-                      {quickActionMode === "payment" ? "Quick Mark as Fully Paid" : "Quick Mark as Present"}
+                      {quickActionMode === "payment" 
+                        ? "Quick Mark as Fully Paid" 
+                        : quickActionMode === "attendance"
+                        ? "Quick Mark as Present"
+                        : "Send Confirmation Emails"}
                     </span>
                   </div>
                   <Button 
@@ -395,6 +524,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                     variant="ghost"
                     onClick={handleCancelQuickAction}
                     className="h-8 w-8 p-0 flex-shrink-0"
+                    disabled={isSendingEmails}
                   >
                     <X className="h-4 w-4" />
                   </Button>
@@ -430,13 +560,88 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                     <Button 
                       size="sm" 
                       onClick={executeQuickAction}
-                      disabled={selectedIds.length === 0 || (quickActionMode === "attendance" && !selectedDate)}
-                      className="whitespace-nowrap"
+                      disabled={
+                        selectedIds.length === 0 || 
+                        (quickActionMode === "attendance" && !selectedDate) ||
+                        isSendingEmails
+                      }
+                      className="whitespace-nowrap gap-2"
                     >
-                      Apply to {selectedIds.length}
+                      {isSendingEmails ? (
+                        <>
+                          <Send className="h-4 w-4 animate-pulse" />
+                          Sending...
+                        </>
+                      ) : (
+                        <>
+                          {quickActionMode === "email" ? "Send Emails" : `Apply to ${selectedIds.length}`}
+                        </>
+                      )}
                     </Button>
                   </div>
                 </div>
+
+                {/* Email Progress */}
+                {isSendingEmails && (
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-sm">
+                      <span>Sending emails...</span>
+                      <span className="font-medium">
+                        {emailProgress.current} / {emailProgress.total}
+                      </span>
+                    </div>
+                    <Progress 
+                      value={(emailProgress.current / emailProgress.total) * 100} 
+                      className="h-2"
+                    />
+                  </div>
+                )}
+
+                {/* Email Results */}
+                {showEmailResults && emailResults.length > 0 && (
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="font-semibold text-sm">Email Results</h4>
+                      <div className="flex gap-3 text-xs">
+                        <span className="text-green-600">✓ {successCount} sent</span>
+                        {errorCount > 0 && <span className="text-red-600">✗ {errorCount} failed</span>}
+                        {skippedCount > 0 && <span className="text-orange-600">⊘ {skippedCount} skipped</span>}
+                      </div>
+                    </div>
+                    
+                    <div className="max-h-60 overflow-y-auto space-y-2 bg-white rounded border p-3">
+                      {emailResults.map((result, idx) => (
+                        <div 
+                          key={idx} 
+                          className={`flex items-start gap-2 text-sm p-2 rounded ${
+                            result.status === "success" 
+                              ? "bg-green-50 border-l-2 border-green-500" 
+                              : result.status === "skipped"
+                              ? "bg-orange-50 border-l-2 border-orange-500"
+                              : "bg-red-50 border-l-2 border-red-500"
+                          }`}
+                        >
+                          <div className="flex-shrink-0 mt-0.5">
+                            {result.status === "success" ? (
+                              <CheckCircle2 className="h-4 w-4 text-green-600" />
+                            ) : result.status === "skipped" ? (
+                              <AlertCircle className="h-4 w-4 text-orange-600" />
+                            ) : (
+                              <X className="h-4 w-4 text-red-600" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="font-medium truncate">{result.name}</div>
+                            <div className="text-xs text-muted-foreground truncate">{result.email}</div>
+                            {result.error && (
+                              <div className="text-xs text-red-600 mt-1">{result.error}</div>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
@@ -454,6 +659,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                         checked={selectedIds.length === filteredAttendees.length && filteredAttendees.length > 0}
                         onChange={toggleSelectAll}
                         className="cursor-pointer"
+                        disabled={isSendingEmails}
                       />
                     </th>
                   )}
@@ -484,6 +690,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                           checked={selectedIds.includes(attendee.id)}
                           onChange={() => toggleSelectAttendee(attendee.id)}
                           className="cursor-pointer"
+                          disabled={isSendingEmails}
                         />
                       </td>
                     )}

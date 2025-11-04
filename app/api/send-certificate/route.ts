@@ -67,7 +67,7 @@ async function generateCertificatePDF(
     const page = pdfDoc.addPage([842, 595]);
 
     // Load template image
-    let templateImageBytes: ArrayBuffer;
+let templateImageBytes: ArrayBuffer | Buffer;
     
     if (template?.image_url) {
       console.log("Fetching custom template from:", template.image_url);
