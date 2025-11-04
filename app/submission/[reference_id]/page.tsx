@@ -1,3 +1,4 @@
+//app\submission\[reference_id]\page.tsx
 export const dynamic = "force-dynamic"
 
 import { supabaseServer } from "@/lib/supabase-server"

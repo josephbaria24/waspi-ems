@@ -29,6 +29,7 @@ interface Attendee {
   position?: string
   company_address?: string
   payment_status?: string
+  reference_id?: string
 }
 
 interface EventScheduleDate {
@@ -85,7 +86,8 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
             company: a.company,
             position: a.position,
             company_address: a.company_address,
-            payment_status: a.payment_status || "Pending"
+            payment_status: a.payment_status || "Pending",
+            reference_id: a.reference_id
           }))
         )
       }
@@ -245,9 +247,19 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       }
 
       try {
-        // Generate reference ID and submission link
-        const referenceId = `REF-${attendee.id}-${Date.now()}`
-        const submissionLink = `${window.location.origin}/submission/${referenceId}`
+        // Check if reference_id exists
+        if (!attendee.reference_id) {
+          results.push({
+            name: attendee.name,
+            email: attendee.email,
+            status: "error",
+            error: "Reference ID not found for this attendee"
+          })
+          setEmailProgress({ current: i + 1, total: selectedAttendees.length })
+          continue
+        }
+
+        const submissionLink = `${window.location.origin}/submission/${attendee.reference_id}`
 
         const response = await fetch("/api/send-confirmation", {
           method: "POST",
@@ -255,7 +267,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
           body: JSON.stringify({
             email: attendee.email,
             name: attendee.name,
-            reference_id: referenceId,
+            reference_id: attendee.reference_id,
             event_name: eventName,
             venue: venue,
             link: submissionLink
