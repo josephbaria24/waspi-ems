@@ -37,7 +37,8 @@ async function generateCertificatePDF(
   eventName: string,
   eventDate: string,
   eventVenue: string,
-  eventId: number
+  eventId: number,
+  templateType: "participation" | "awardee" | "attendance" = "participation"
 ): Promise<Buffer> {
   try {
     // Get custom template from database
@@ -47,6 +48,7 @@ async function generateCertificatePDF(
       .from("certificate_templates")
       .select("*")
       .eq("event_id", eventId)
+      .eq("template_type", templateType)
       .maybeSingle();
 
     if (templateError) {

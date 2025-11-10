@@ -7,10 +7,11 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Upload, X, Plus, Trash2, Save, Eye, Loader2 } from "lucide-react"
+import { Upload, X, Plus, Trash2, Save, Eye, Loader2, Award, CalendarCheck, Trophy } from "lucide-react"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Slider } from "@/components/ui/slider"
 import { supabase } from "@/lib/supabase-client"
+import React from "react"
 
 interface TextField {
   id: string
@@ -30,16 +31,31 @@ interface CertificateTemplateModalProps {
   onClose: () => void
 }
 
-export default function CertificateTemplateModal({ eventId, open, onClose }: CertificateTemplateModalProps) {
-  const [templateImage, setTemplateImage] = useState<string | null>(null)
-  const [templateFile, setTemplateFile] = useState<File | null>(null)
-  const [uploading, setUploading] = useState(false)
-  const [saving, setSaving] = useState(false)
-  const [previewMode, setPreviewMode] = useState(false)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-  const canvasRef = useRef<HTMLCanvasElement>(null)
-  
-  const [textFields, setTextFields] = useState<TextField[]>([
+type TemplateType = "participation" | "awardee" | "attendance"
+
+const TEMPLATE_TYPES: { value: TemplateType; label: string; icon: any; description: string }[] = [
+  { 
+    value: "participation", 
+    label: "Participation", 
+    icon: Award,
+    description: "Certificate for event participants"
+  },
+  { 
+    value: "awardee", 
+    label: "Awardee", 
+    icon: Trophy,
+    description: "Certificate for award recipients"
+  },
+  { 
+    value: "attendance", 
+    label: "Attendance", 
+    icon: CalendarCheck,
+    description: "Certificate for attendance"
+  }
+]
+
+const DEFAULT_FIELDS: Record<TemplateType, TextField[]> = {
+  participation: [
     {
       id: "name",
       label: "Attendee Name",
@@ -73,47 +89,141 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
       color: "#34495E",
       align: "center"
     }
-  ])
+  ],
+  awardee: [
+    {
+      id: "name",
+      label: "Awardee Name",
+      value: "{{attendee_name}}",
+      x: 421,
+      y: 335,
+      fontSize: 40,
+      fontWeight: "bold",
+      color: "#C0392B",
+      align: "center"
+    },
+    {
+      id: "award",
+      label: "Award Title",
+      value: "Outstanding Achievement Award",
+      x: 421,
+      y: 275,
+      fontSize: 18,
+      fontWeight: "bold",
+      color: "#8E44AD",
+      align: "center"
+    },
+    {
+      id: "event",
+      label: "Event Name",
+      value: "at {{event_name}}",
+      x: 421,
+      y: 245,
+      fontSize: 14,
+      fontWeight: "normal",
+      color: "#34495E",
+      align: "center"
+    }
+  ],
+  attendance: [
+    {
+      id: "name",
+      label: "Attendee Name",
+      value: "{{attendee_name}}",
+      x: 421,
+      y: 335,
+      fontSize: 36,
+      fontWeight: "bold",
+      color: "#2C3E50",
+      align: "center"
+    },
+    {
+      id: "event",
+      label: "Event Name",
+      value: "attended {{event_name}}",
+      x: 421,
+      y: 275,
+      fontSize: 14,
+      fontWeight: "normal",
+      color: "#34495E",
+      align: "center"
+    },
+    {
+      id: "date",
+      label: "Event Date",
+      value: "on {{event_date}}",
+      x: 421,
+      y: 250,
+      fontSize: 14,
+      fontWeight: "normal",
+      color: "#34495E",
+      align: "center"
+    }
+  ]
+}
+
+export default function CertificateTemplateModal({ eventId, open, onClose }: CertificateTemplateModalProps) {
+  const [currentTemplateType, setCurrentTemplateType] = useState<TemplateType>("participation")
+  const [templateImage, setTemplateImage] = useState<Record<TemplateType, string | null>>({
+    participation: null,
+    awardee: null,
+    attendance: null
+  })
+  const [templateFile, setTemplateFile] = useState<Record<TemplateType, File | null>>({
+    participation: null,
+    awardee: null,
+    attendance: null
+  })
+  const [uploading, setUploading] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [previewMode, setPreviewMode] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  
+  const [textFields, setTextFields] = useState<Record<TemplateType, TextField[]>>({
+    participation: DEFAULT_FIELDS.participation,
+    awardee: DEFAULT_FIELDS.awardee,
+    attendance: DEFAULT_FIELDS.attendance
+  })
 
   const [selectedField, setSelectedField] = useState<string | null>(null)
   const [isDragging, setIsDragging] = useState(false)
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 })
 
-  // Load template from database
+  // Load all templates from database
   useEffect(() => {
     if (open && eventId) {
-      loadTemplate()
+      loadAllTemplates()
     }
   }, [open, eventId])
 
-  const loadTemplate = async () => {
-    try {
-      const response = await fetch(`/api/certificate-template?eventId=${eventId}`)
-      if (response.ok) {
-        const data = await response.json()
-        if (data.template) {
-          setTemplateImage(data.template.image_url)
-          if (data.template.fields) {
-            setTextFields(data.template.fields)
+  const loadAllTemplates = async () => {
+    for (const type of TEMPLATE_TYPES) {
+      try {
+        const response = await fetch(`/api/certificate-template?eventId=${eventId}&templateType=${type.value}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.template) {
+            setTemplateImage(prev => ({ ...prev, [type.value]: data.template.image_url }))
+            if (data.template.fields) {
+              setTextFields(prev => ({ ...prev, [type.value]: data.template.fields }))
+            }
           }
         }
+      } catch (error) {
+        console.error(`Error loading ${type.value} template:`, error)
       }
-    } catch (error) {
-      console.error("Error loading template:", error)
     }
   }
 
-  // Upload image to Supabase Storage
-  const uploadImageToStorage = async (file: File): Promise<string | null> => {
+  const uploadImageToStorage = async (file: File, templateType: TemplateType): Promise<string | null> => {
     try {
       setUploading(true)
       
-      // Create unique filename
       const fileExt = file.name.split('.').pop()
-      const fileName = `${eventId}-${Date.now()}.${fileExt}`
+      const fileName = `${eventId}-${templateType}-${Date.now()}.${fileExt}`
       const filePath = `certificate-templates/${fileName}`
 
-      // Upload to Supabase Storage
       const { data, error } = await supabase.storage
         .from('certificates')
         .upload(filePath, file, {
@@ -123,7 +233,6 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
 
       if (error) throw error
 
-      // Get public URL
       const { data: urlData } = supabase.storage
         .from('certificates')
         .getPublicUrl(filePath)
@@ -138,25 +247,22 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
     }
   }
 
-  // Handle image upload
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Show preview immediately
       const reader = new FileReader()
       reader.onload = (event) => {
-        setTemplateImage(event.target?.result as string)
+        setTemplateImage(prev => ({ ...prev, [currentTemplateType]: event.target?.result as string }))
       }
       reader.readAsDataURL(file)
       
-      // Store file for later upload
-      setTemplateFile(file)
+      setTemplateFile(prev => ({ ...prev, [currentTemplateType]: file }))
     }
   }
 
   // Draw canvas
   useEffect(() => {
-    if (!canvasRef.current || !templateImage) return
+    if (!canvasRef.current || !templateImage[currentTemplateType]) return
 
     const canvas = canvasRef.current
     const ctx = canvas.getContext("2d")
@@ -168,7 +274,7 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
       canvas.height = 595
       ctx.drawImage(img, 0, 0, 842, 595)
 
-      textFields.forEach((field) => {
+      textFields[currentTemplateType].forEach((field) => {
         ctx.font = `${field.fontWeight === "bold" ? "bold " : ""}${field.fontSize}px Arial`
         ctx.fillStyle = field.color
         ctx.textAlign = field.align
@@ -209,8 +315,8 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
         }
       })
     }
-    img.src = templateImage
-  }, [templateImage, textFields, selectedField, previewMode])
+    img.src = templateImage[currentTemplateType]!
+  }, [templateImage, textFields, selectedField, previewMode, currentTemplateType])
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLCanvasElement>) => {
     if (previewMode) return
@@ -227,7 +333,7 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
     const ctx = canvas.getContext("2d")
     if (!ctx) return
 
-    for (const field of textFields) {
+    for (const field of textFields[currentTemplateType]) {
       ctx.font = `${field.fontWeight === "bold" ? "bold " : ""}${field.fontSize}px Arial`
       const metrics = ctx.measureText(field.value)
       const textWidth = metrics.width
@@ -270,13 +376,14 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
     const x = (e.clientX - rect.left) * scaleX
     const y = (e.clientY - rect.top) * scaleY
 
-    setTextFields((fields) =>
-      fields.map((field) =>
+    setTextFields((prev) => ({
+      ...prev,
+      [currentTemplateType]: prev[currentTemplateType].map((field) =>
         field.id === selectedField
           ? { ...field, x: x - dragOffset.x, y: y - dragOffset.y }
           : field
       )
-    )
+    }))
   }
 
   const addTextField = () => {
@@ -291,46 +398,52 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
       color: "#000000",
       align: "center"
     }
-    setTextFields([...textFields, newField])
+    setTextFields(prev => ({
+      ...prev,
+      [currentTemplateType]: [...prev[currentTemplateType], newField]
+    }))
     setSelectedField(newField.id)
   }
 
   const updateField = (updates: Partial<TextField>) => {
     if (!selectedField) return
-    setTextFields((fields) =>
-      fields.map((field) =>
+    setTextFields((prev) => ({
+      ...prev,
+      [currentTemplateType]: prev[currentTemplateType].map((field) =>
         field.id === selectedField ? { ...field, ...updates } : field
       )
-    )
+    }))
   }
 
   const deleteField = (id: string) => {
-    setTextFields((fields) => fields.filter((field) => field.id !== id))
+    setTextFields(prev => ({
+      ...prev,
+      [currentTemplateType]: prev[currentTemplateType].filter((field) => field.id !== id)
+    }))
     if (selectedField === id) {
       setSelectedField(null)
     }
   }
 
   const handleSave = async () => {
-    if (!templateImage) {
+    if (!templateImage[currentTemplateType]) {
       alert("Please upload a template image first")
       return
     }
 
     setSaving(true)
     try {
-      let imageUrl = templateImage
+      let imageUrl = templateImage[currentTemplateType]!
 
-      // If there's a new file to upload, upload it first
-      if (templateFile) {
-        const uploadedUrl = await uploadImageToStorage(templateFile)
+      if (templateFile[currentTemplateType]) {
+        const uploadedUrl = await uploadImageToStorage(templateFile[currentTemplateType]!, currentTemplateType)
         if (!uploadedUrl) {
           alert("❌ Failed to upload image")
           setSaving(false)
           return
         }
         imageUrl = uploadedUrl
-        setTemplateFile(null) // Clear after successful upload
+        setTemplateFile(prev => ({ ...prev, [currentTemplateType]: null }))
       }
 
       const response = await fetch("/api/certificate-template", {
@@ -339,13 +452,13 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
         body: JSON.stringify({
           eventId,
           imageUrl: imageUrl,
-          fields: textFields
+          fields: textFields[currentTemplateType],
+          templateType: currentTemplateType
         })
       })
 
       if (response.ok) {
-        alert("✅ Template saved successfully!")
-        onClose()
+        alert(`✅ ${TEMPLATE_TYPES.find(t => t.value === currentTemplateType)?.label} template saved successfully!`)
       } else {
         alert("❌ Failed to save template")
       }
@@ -357,22 +470,108 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
     }
   }
 
-  const currentField = textFields.find((f) => f.id === selectedField)
+  const handleSaveAll = async () => {
+    setSaving(true)
+    let successCount = 0
+    let errorCount = 0
+
+    for (const type of TEMPLATE_TYPES) {
+      if (!templateImage[type.value]) continue
+
+      try {
+        let imageUrl = templateImage[type.value]!
+
+        if (templateFile[type.value]) {
+          const uploadedUrl = await uploadImageToStorage(templateFile[type.value]!, type.value)
+          if (!uploadedUrl) {
+            errorCount++
+            continue
+          }
+          imageUrl = uploadedUrl
+        }
+
+        const response = await fetch("/api/certificate-template", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventId,
+            imageUrl: imageUrl,
+            fields: textFields[type.value],
+            templateType: type.value
+          })
+        })
+
+        if (response.ok) {
+          successCount++
+        } else {
+          errorCount++
+        }
+      } catch (error) {
+        console.error(`Error saving ${type.value} template:`, error)
+        errorCount++
+      }
+    }
+
+    setSaving(false)
+    
+    if (errorCount === 0) {
+      alert(`✅ All ${successCount} template(s) saved successfully!`)
+      onClose()
+    } else {
+      alert(`⚠️ Saved ${successCount} template(s), ${errorCount} failed`)
+    }
+  }
+
+  const currentField = textFields[currentTemplateType].find((f) => f.id === selectedField)
+  const currentTemplateInfo = TEMPLATE_TYPES.find(t => t.value === currentTemplateType)!
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Certificate Template Editor</DialogTitle>
           <DialogDescription>
-            Upload a template and customize text fields for your certificates
+            Upload and customize certificate templates for your event
           </DialogDescription>
         </DialogHeader>
+
+        {/* Template Type Selector */}
+        <div className="flex gap-2 p-4 bg-muted rounded-lg">
+          {TEMPLATE_TYPES.map((type) => {
+            const Icon = type.icon
+            const hasTemplate = !!templateImage[type.value]
+            
+            return (
+              <Button
+                key={type.value}
+                variant={currentTemplateType === type.value ? "default" : "outline"}
+                className="flex-1 flex flex-col h-auto py-3"
+                onClick={() => {
+                  setCurrentTemplateType(type.value)
+                  setSelectedField(null)
+                }}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className="h-4 w-4" />
+                  {type.label}
+                  {hasTemplate && <span className="text-xs">✓</span>}
+                </div>
+                <span className="text-xs opacity-70 font-normal">{type.description}</span>
+              </Button>
+            )
+          })}
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2 space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="font-semibold">Preview</h3>
+              <div>
+                <h3 className="font-semibold flex items-center gap-2">
+                  {React.createElement(currentTemplateInfo.icon, { className: "h-4 w-4" })}
+                  {currentTemplateInfo.label} Template
+                </h3>
+                <p className="text-xs text-muted-foreground">{currentTemplateInfo.description}</p>
+              </div>
               <div className="flex gap-2">
                 <Button
                   variant={previewMode ? "default" : "outline"}
@@ -404,7 +603,7 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
             </div>
 
             <div className="border rounded-lg overflow-hidden bg-gray-50">
-              {templateImage ? (
+              {templateImage[currentTemplateType] ? (
                 <canvas
                   ref={canvasRef}
                   className="w-full cursor-crosshair"
@@ -418,7 +617,7 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
                 <div className="flex items-center justify-center h-64 text-muted-foreground">
                   <div className="text-center">
                     <Upload className="h-12 w-12 mx-auto mb-2 opacity-50" />
-                    <p>Upload a certificate template to get started</p>
+                    <p>Upload a {currentTemplateInfo.label.toLowerCase()} certificate template</p>
                     <p className="text-xs mt-1">Recommended: 842x595 pixels (A4 landscape)</p>
                   </div>
                 </div>
@@ -453,7 +652,7 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
                 </Button>
 
                 <div className="space-y-2 max-h-96 overflow-y-auto">
-                  {textFields.map((field) => (
+                  {textFields[currentTemplateType].map((field) => (
                     <div
                       key={field.id}
                       className={`p-3 border rounded-lg cursor-pointer transition-colors ${
@@ -613,14 +812,20 @@ export default function CertificateTemplateModal({ eventId, open, onClose }: Cer
           </div>
         </div>
 
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="flex justify-between gap-2 pt-4 border-t">
           <Button variant="outline" onClick={onClose}>
             Cancel
           </Button>
-          <Button onClick={handleSave} disabled={saving || uploading}>
-            <Save className="h-4 w-4 mr-2" />
-            {saving ? "Saving..." : "Save Template"}
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={handleSave} disabled={saving || uploading} variant="outline">
+              <Save className="h-4 w-4 mr-2" />
+              Save This Template
+            </Button>
+            <Button onClick={handleSaveAll} disabled={saving || uploading}>
+              <Save className="h-4 w-4 mr-2" />
+              {saving ? "Saving All..." : "Save All Templates"}
+            </Button>
+          </div>
         </div>
       </DialogContent>
     </Dialog>

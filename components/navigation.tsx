@@ -1,7 +1,7 @@
 "use client"
 
+import { useState } from "react"
 import type React from "react"
-import { useRouter } from "next/navigation"
 import { Calendar, Settings, LogOut, Bell, Search, QrCode } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase-client"
@@ -12,21 +12,23 @@ interface NavigationProps {
 }
 
 export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
-  const router = useRouter()
+  const [active, setActive] = useState<"events" | "qr" | "settings">("events")
 
   const handleComingSoon = () => {
     toast.info("🚧 This feature will be available soon!", { duration: 3000 })
   }
 
   const handleQRScanner = () => {
-    if (currentEventId) {
-      if (onQRScanClick) {
-        onQRScanClick()
-      } else {
-        router.push(`/events/${currentEventId}/qr-scan`)
-      }
-    } else {
+    if (!currentEventId) {
       toast.error("Please select an event first to use QR Scanner")
+      return
+    }
+
+    setActive("qr")
+    if (onQRScanClick) {
+      onQRScanClick()
+    } else {
+      toast.success("📷 QR Scanner opened!")
     }
   }
 
@@ -35,7 +37,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
       const { error } = await supabase.auth.signOut()
       if (error) throw error
       toast.success("👋 You've been logged out successfully.")
-      router.replace("/login")
+      window.location.href = "/login"
     } catch (err: any) {
       console.error("Logout error:", err)
       toast.error("Failed to log out. Please try again.")
@@ -47,34 +49,42 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
       {/* Top navigation bar */}
       <nav className="border-b border-border bg-card">
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 relative">
-          {/* Left side (Logo + Text) */}
+          {/* Left: Logo */}
           <div className="flex items-center gap-2">
             <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent">
               <img src="/waspi-logo.png" alt="Logo" className="h-10 w-10 object-contain" />
             </div>
 
-            {/* Hide text on small screens */}
             <div className="hidden sm:flex flex-col leading-tight">
               <span className="font-bold text-foreground text-lg">WASPI</span>
               <span className="text-sm text-muted-foreground">Event Management System</span>
             </div>
           </div>
 
-          {/* Center Nav — hide on very small screens */}
+          {/* Center Nav */}
           <div className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-1">
-            <NavIcon icon={Calendar} label="Events" active />
+           
             <NavIcon
               icon={QrCode}
               label="QR Scanner"
               onClick={handleQRScanner}
               disabled={!currentEventId}
+              active={active === "qr"}
             />
-            <NavIcon icon={Settings} label="Settings" onClick={handleComingSoon} />
+            <NavIcon
+              icon={Settings}
+              label="Settings"
+              onClick={() => {
+                handleComingSoon()
+                setActive("settings")
+              }}
+              active={active === "settings"}
+            />
           </div>
 
           {/* Right side actions */}
           <div className="flex items-center gap-3 sm:gap-4">
-            {/* Search only visible on md+ */}
+            {/* Search (md+) */}
             <div className="relative hidden md:block">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <input
@@ -84,7 +94,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
               />
             </div>
 
-            {/* 🔔 Bell */}
+            {/* Bell */}
             <button
               className="relative p-2 text-muted-foreground hover:text-foreground"
               onClick={handleComingSoon}
@@ -93,7 +103,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
               <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span>
             </button>
 
-            {/* 🚪 Logout */}
+            {/* Logout */}
             <button
               onClick={handleLogout}
               className="p-2 text-muted-foreground hover:text-destructive"
@@ -105,7 +115,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
         </div>
       </nav>
 
-      {/* 📱 Floating QR Scanner button for mobile */}
+      {/* 📱 Floating QR Scanner button */}
       <button
         onClick={handleQRScanner}
         disabled={!currentEventId}

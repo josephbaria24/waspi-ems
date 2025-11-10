@@ -11,18 +11,20 @@ export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url);
     const eventId = searchParams.get("eventId");
+    const templateType = searchParams.get("templateType") || "participation";
 
     if (!eventId) {
       return NextResponse.json({ error: "Missing eventId" }, { status: 400 });
     }
 
-    console.log(`Fetching template for event ID: ${eventId}`);
+    console.log(`Fetching ${templateType} template for event ID: ${eventId}`);
 
     // Get template from database
     const { data, error } = await supabase
       .from("certificate_templates")
       .select("*")
       .eq("event_id", eventId)
+      .eq("template_type", templateType)
       .maybeSingle();
 
     if (error) {
@@ -32,7 +34,6 @@ export async function GET(req: Request) {
 
     console.log("Template data:", data);
 
-    // Return the data directly (send-certificate uses snake_case)
     return NextResponse.json({ template: data });
   } catch (error: any) {
     console.error("Error fetching template:", error);
@@ -45,9 +46,14 @@ export async function GET(req: Request) {
 
 export async function POST(req: Request) {
   try {
-    const { eventId, imageUrl, fields } = await req.json();
+    const { eventId, imageUrl, fields, templateType = "participation" } = await req.json();
 
-    console.log("Saving template:", { eventId, imageUrl: imageUrl?.substring(0, 50), fieldsCount: fields?.length });
+    console.log("Saving template:", { 
+      eventId, 
+      templateType,
+      imageUrl: imageUrl?.substring(0, 50), 
+      fieldsCount: fields?.length 
+    });
 
     if (!eventId || !imageUrl) {
       return NextResponse.json(
@@ -56,17 +62,17 @@ export async function POST(req: Request) {
       );
     }
 
-    // Check if template exists
+    // Check if template exists for this event and type
     const { data: existing } = await supabase
       .from("certificate_templates")
       .select("id")
       .eq("event_id", eventId)
+      .eq("template_type", templateType)
       .maybeSingle();
 
     if (existing) {
       console.log("Updating existing template ID:", existing.id);
       
-      // Update existing template
       const { error } = await supabase
         .from("certificate_templates")
         .update({
@@ -74,7 +80,8 @@ export async function POST(req: Request) {
           fields: fields,
           updated_at: new Date().toISOString()
         })
-        .eq("event_id", eventId);
+        .eq("event_id", eventId)
+        .eq("template_type", templateType);
 
       if (error) {
         console.error("Update error:", error);
@@ -83,13 +90,13 @@ export async function POST(req: Request) {
     } else {
       console.log("Creating new template");
       
-      // Insert new template
       const { error } = await supabase
         .from("certificate_templates")
         .insert({
           event_id: eventId,
           image_url: imageUrl,
-          fields: fields
+          fields: fields,
+          template_type: templateType
         });
 
       if (error) {

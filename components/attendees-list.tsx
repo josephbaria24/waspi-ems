@@ -1,8 +1,8 @@
-// Updated AttendeesList with Quick Actions Feature + Email Confirmation
+// Optimized AttendeesList with Quick Actions + Email Confirmation + Roles
 "use client"
 
-import { useEffect, useState } from "react"
-import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle } from "lucide-react"
+import { useEffect, useState, useMemo, useCallback } from "react"
+import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle, Users, Mic, UserCircle } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -30,13 +30,14 @@ interface Attendee {
   company_address?: string
   payment_status?: string
   reference_id?: string
+  roles?: string[]
 }
 
 interface EventScheduleDate {
   date: string // ISO format e.g. "2025-11-06"
 }
 
-type QuickActionMode = "payment" | "attendance" | "email" | null
+type QuickActionMode = "payment" | "attendance" | "email" | "organizer" | "speaker" | "attendee" | null
 
 interface EmailResult {
   name: string
@@ -87,7 +88,8 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
             position: a.position,
             company_address: a.company_address,
             payment_status: a.payment_status || "Pending",
-            reference_id: a.reference_id
+            reference_id: a.reference_id,
+            roles: a.roles || []
           }))
         )
       }
@@ -95,6 +97,12 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
 
     fetchAttendees()
   }, [eventId])
+
+  // Check if attendee is exempt from payment (Organizer or Speaker)
+  const isPaymentExempt = useCallback((roles?: string[]) => {
+    if (!roles || roles.length === 0) return false
+    return roles.includes("Organizer") || roles.includes("Speaker")
+  }, [])
 
   const toggleAttendance = async (attendeeId: number, isoDate: string) => {
     const epochDate = new Date(isoDate).getTime()
@@ -137,6 +145,29 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       setAttendees((prev) =>
         prev.map((a) =>
           a.id === attendeeId ? { ...a, payment_status: status } : a
+        )
+      )
+    }
+  }
+
+  const toggleRole = async (attendeeId: number, role: string) => {
+    const attendee = attendees.find(a => a.id === attendeeId)
+    if (!attendee) return
+
+    const currentRoles = attendee.roles || []
+    const updatedRoles = currentRoles.includes(role)
+      ? currentRoles.filter(r => r !== role)
+      : [...currentRoles, role]
+
+    const { error } = await supabase
+      .from("attendees")
+      .update({ roles: updatedRoles })
+      .eq("id", attendeeId)
+
+    if (!error) {
+      setAttendees((prev) =>
+        prev.map((a) =>
+          a.id === attendeeId ? { ...a, roles: updatedRoles } : a
         )
       )
     }
@@ -207,7 +238,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
   // Email Validation
   const isValidEmail = (email: string): boolean => {
     const trimmed = email.trim()
-    if (!trimmed || trimmed !== email) return false // Has whitespace
+    if (!trimmed || trimmed !== email) return false
     const regex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
     return regex.test(trimmed)
   }
@@ -226,15 +257,12 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     setEmailProgress({ current: 0, total: selectedAttendees.length })
     setEmailResults([])
 
-    // Get event details (you'll need to pass these as props or fetch them)
-    // For now, using placeholder values
     const eventName = "Event Name" // TODO: Pass as prop
     const venue = "Event Venue" // TODO: Pass as prop
 
     for (let i = 0; i < selectedAttendees.length; i++) {
       const attendee = selectedAttendees[i]
       
-      // Validate email
       if (!isValidEmail(attendee.email)) {
         results.push({
           name: attendee.name,
@@ -247,7 +275,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       }
 
       try {
-        // Check if reference_id exists
         if (!attendee.reference_id) {
           results.push({
             name: attendee.name,
@@ -307,7 +334,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     setShowEmailResults(true)
   }
 
-  // Quick Actions Functions
   const handleQuickActionSelect = (mode: QuickActionMode) => {
     setQuickActionMode(mode)
     setSelectedIds([])
@@ -352,7 +378,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     }
 
     if (quickActionMode === "payment") {
-      // Mark as Fully Paid
       const updates = selectedIds.map(id => 
         supabase
           .from("attendees")
@@ -369,8 +394,56 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       )
       
       alert(`✅ Marked ${selectedIds.length} attendee(s) as Fully Paid`)
+    } else if (quickActionMode === "organizer" || quickActionMode === "speaker" || quickActionMode === "attendee") {
+      const roleToAdd = quickActionMode === "organizer" ? "Organizer" : quickActionMode === "speaker" ? "Speaker" : "Attendee"
+      
+      const updates = selectedIds.map(async (id) => {
+        const attendee = attendees.find(a => a.id === id)
+        if (!attendee) return
+        
+        const currentRoles = attendee.roles || []
+        const updatedRoles = currentRoles.includes(roleToAdd)
+          ? currentRoles
+          : [...currentRoles, roleToAdd]
+        
+        return supabase
+          .from("attendees")
+          .update({ roles: updatedRoles })
+          .eq("id", id)
+      })
+      
+      await Promise.all(updates)
+      
+      const { data } = await supabase
+        .from("attendees")
+        .select("*")
+        .eq("event_id", parseInt(eventId))
+      
+      if (data) {
+        setAttendees(
+          data.map((a: any) => ({
+            id: a.id,
+            name: `${a.personal_name ?? ""} ${a.last_name ?? ""}`.trim(),
+            email: a.email ?? "",
+            attendance: a.attendance || [],
+            personal_name: a.personal_name,
+            middle_name: a.middle_name,
+            last_name: a.last_name,
+            mobile_number: a.mobile_number,
+            date_of_birth: a.date_of_birth,
+            address: a.address,
+            company: a.company,
+            position: a.position,
+            company_address: a.company_address,
+            payment_status: a.payment_status || "Pending",
+            reference_id: a.reference_id,
+            roles: a.roles || []
+          }))
+        )
+      }
+      
+      alert(`✅ Marked ${selectedIds.length} attendee(s) as ${roleToAdd}`)
     } else if (quickActionMode === "attendance" && selectedDate) {
-      // Mark as Present for selected date
       const epochDate = new Date(selectedDate).getTime()
       
       const updates = selectedIds.map(async (id) => {
@@ -396,7 +469,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       
       await Promise.all(updates)
       
-      // Refresh attendees
       const { data } = await supabase
         .from("attendees")
         .select("*")
@@ -418,7 +490,9 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
             company: a.company,
             position: a.position,
             company_address: a.company_address,
-            payment_status: a.payment_status || "Pending"
+            payment_status: a.payment_status || "Pending",
+            reference_id: a.reference_id,
+            roles: a.roles || []
           }))
         )
       }
@@ -429,24 +503,29 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     handleCancelQuickAction()
   }
   
-  const filteredAttendees = attendees
-    .filter((attendee) => {
-      const name = attendee.name ?? ""
-      const email = attendee.email ?? ""
-      return (
-        name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        email.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+  // Optimized filtering with useMemo
+  const filteredAttendees = useMemo(() => {
+    if (!searchQuery.trim()) return attendees
+    
+    const lowerQuery = searchQuery.toLowerCase()
+    return attendees.filter((attendee) => {
+      const name = attendee.name?.toLowerCase() || ""
+      const email = attendee.email?.toLowerCase() || ""
+      return name.includes(lowerQuery) || email.includes(lowerQuery)
     })
-    .sort((a, b) => a.id - b.id)
+  }, [attendees, searchQuery])
 
-  const getStatusDisplay = (attendee: Attendee, date: string) => {
+  const getStatusDisplay = useCallback((attendee: Attendee, date: string) => {
     const epochDate = new Date(date).getTime()
     const record = attendee.attendance.find((a) => a.date === epochDate)
     return record?.status ?? "Pending"
-  }
+  }, [])
 
-  const getPaymentStatusColor = (status?: string) => {
+  const getPaymentStatusColor = useCallback((status?: string, roles?: string[]) => {
+    if (isPaymentExempt(roles)) {
+      return "bg-gray-200 text-gray-500 border-gray-300 opacity-50"
+    }
+    
     switch (status) {
       case "Fully Paid":
         return "bg-green-100 text-green-700 border-green-300"
@@ -455,6 +534,32 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
       case "Pending":
       default:
         return "bg-gray-100 text-gray-700 border-gray-300"
+    }
+  }, [isPaymentExempt])
+
+  const getRoleIcon = (role: string) => {
+    switch (role) {
+      case "Organizer":
+        return <Users className="h-3 w-3" />
+      case "Speaker":
+        return <Mic className="h-3 w-3" />
+      case "Attendee":
+        return <UserCircle className="h-3 w-3" />
+      default:
+        return null
+    }
+  }
+
+  const getRoleColor = (role: string) => {
+    switch (role) {
+      case "Organizer":
+        return "bg-blue-100 text-blue-700"
+      case "Speaker":
+        return "bg-purple-100 text-purple-700"
+      case "Attendee":
+        return "bg-gray-100 text-gray-700"
+      default:
+        return "bg-gray-100 text-gray-700"
     }
   }
 
@@ -466,9 +571,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     <>
       <Card>
         <CardHeader>
-          {/* Header Section - Responsive Layout */}
           <div className="space-y-4">
-            {/* Title and Description */}
             <div>
               <CardTitle>Attendance Details</CardTitle>
               <CardDescription className="mt-2">
@@ -476,7 +579,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
               </CardDescription>
             </div>
 
-            {/* Search and Quick Actions - Responsive */}
             <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
               <div className="relative w-full sm:w-64 md:w-80">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -489,7 +591,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                 />
               </div>
               
-              {/* Quick Actions Dropdown */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2 w-full sm:w-auto">
@@ -510,16 +611,26 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                     <Calendar className="h-4 w-4 mr-2" />
                     Mark as Present
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleQuickActionSelect("organizer")}>
+                    <Users className="h-4 w-4 mr-2" />
+                    Mark as Organizer
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleQuickActionSelect("speaker")}>
+                    <Mic className="h-4 w-4 mr-2" />
+                    Mark as Speaker
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleQuickActionSelect("attendee")}>
+                    <UserCircle className="h-4 w-4 mr-2" />
+                    Mark as Attendee
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
           </div>
 
-          {/* Quick Action Bar */}
           {quickActionMode && (
             <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
               <div className="flex flex-col gap-4">
-                {/* Top Row - Title and Close */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Zap className="h-5 w-5 text-blue-600 flex-shrink-0" />
@@ -528,6 +639,12 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                         ? "Quick Mark as Fully Paid" 
                         : quickActionMode === "attendance"
                         ? "Quick Mark as Present"
+                        : quickActionMode === "organizer"
+                        ? "Quick Mark as Organizer"
+                        : quickActionMode === "speaker"
+                        ? "Quick Mark as Speaker"
+                        : quickActionMode === "attendee"
+                        ? "Quick Mark as Attendee"
                         : "Send Confirmation Emails"}
                     </span>
                   </div>
@@ -542,7 +659,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   </Button>
                 </div>
 
-                {/* Bottom Row - Controls */}
                 <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
                   {quickActionMode === "attendance" && (
                     <Select value={selectedDate} onValueChange={setSelectedDate}>
@@ -593,7 +709,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   </div>
                 </div>
 
-                {/* Email Progress */}
                 {isSendingEmails && (
                   <div className="space-y-2">
                     <div className="flex justify-between text-sm">
@@ -609,7 +724,6 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   </div>
                 )}
 
-                {/* Email Results */}
                 {showEmailResults && emailResults.length > 0 && (
                   <div className="space-y-3">
                     <div className="flex items-center justify-between">
@@ -675,12 +789,12 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                       />
                     </th>
                   )}
-                   <th className="text-center py-3 px-3 font-semibold bg-background">Actions</th>
+                  <th className="text-center py-3 px-3 font-semibold bg-background">Actions</th>
                   <th className={`text-left py-3 px-3 font-semibold bg-background ${quickActionMode ? '' : 'sticky left-0 z-20'}`}>
                     Attendee
                   </th>
+                  <th className="text-center py-3 px-3 font-semibold bg-background">Roles</th>
                   <th className="text-center py-3 px-3 font-semibold bg-background">Payment Status</th>
-                 
                   {scheduleDates.map((d) => (
                     <th key={d.date} className="text-left py-3 px-3 font-semibold bg-background whitespace-nowrap">
                       {new Date(d.date).toLocaleDateString(undefined, {
@@ -693,85 +807,153 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                 </tr>
               </thead>
               <tbody>
-                {filteredAttendees.map((attendee) => (
-                  <tr key={attendee.id} className="border-b hover:bg-muted/50">
-                    {quickActionMode && (
-                      <td className="px-3 py-3 sticky left-0 bg-background z-10">
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(attendee.id)}
-                          onChange={() => toggleSelectAttendee(attendee.id)}
-                          className="cursor-pointer"
-                          disabled={isSendingEmails}
-                        />
-                      </td>
-                    )}
-                    <td className="px-3 py-3 text-center bg-background">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEditClick(attendee)}
-                        className="h-8 w-8"
-                        disabled={quickActionMode !== null}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
-                    </td>
-                    <td className={`px-3 py-3 font-medium bg-background whitespace-nowrap ${quickActionMode ? '' : 'sticky left-0'}`}>
-                      {attendee.name}
-                    </td>
-                    <td className="px-3 py-3 text-center bg-background">
-                      <Select
-                        value={attendee.payment_status || "Pending"}
-                        onValueChange={(value) => updatePaymentStatus(attendee.id, value)}
-                        disabled={quickActionMode !== null}
-                      >
-                        <SelectTrigger className={`w-[140px] mx-auto text-xs ${getPaymentStatusColor(attendee.payment_status)}`}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Pending">
-                            <div className="flex items-center gap-2">
-                              <Clock className="h-3 w-3" />
-                              Pending
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="Partially Paid">
-                            <div className="flex items-center gap-2">
-                              <TrendingUp className="h-3 w-3" />
-                              Partially Paid
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="Fully Paid">
-                            <div className="flex items-center gap-2">
-                              <CheckCircle2 className="h-3 w-3" />
-                              Fully Paid
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </td>
-                    
-                    {scheduleDates.map((d) => (
-                      <td key={d.date} className="px-3 py-3">
+                {filteredAttendees.map((attendee) => {
+                  const exempt = isPaymentExempt(attendee.roles)
+                  
+                  return (
+                    <tr key={attendee.id} className="border-b hover:bg-muted/50">
+                      {quickActionMode && (
+                        <td className="px-3 py-3 sticky left-0 bg-background z-10">
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.includes(attendee.id)}
+                            onChange={() => toggleSelectAttendee(attendee.id)}
+                            className="cursor-pointer"
+                            disabled={isSendingEmails}
+                          />
+                        </td>
+                      )}
+                      <td className="px-3 py-3 text-center bg-background">
                         <Button
                           variant="ghost"
-                          onClick={() => toggleAttendance(attendee.id, d.date)}
+                          size="icon"
+                          onClick={() => handleEditClick(attendee)}
+                          className="h-8 w-8"
                           disabled={quickActionMode !== null}
-                          className={`rounded-full px-3 py-1 border text-xs cursor-pointer whitespace-nowrap ${
-                            getStatusDisplay(attendee, d.date) === "Present"
-                              ? "bg-green-100 text-green-700 hover:bg-green-200"
-                              : getStatusDisplay(attendee, d.date) === "Absent"
-                              ? "bg-red-100 text-red-700 hover:bg-red-200"
-                              : "bg-muted text-muted-foreground hover:bg-muted/80"
-                          }`}
                         >
-                          {getStatusDisplay(attendee, d.date)} <Calendar className="ml-1 h-3 w-3" />
+                          <Pencil className="h-4 w-4" />
                         </Button>
                       </td>
-                    ))}
-                  </tr>
-                ))}
+                      <td className={`px-3 py-3 font-medium bg-background whitespace-nowrap ${quickActionMode ? '' : 'sticky left-0'}`}>
+                        {attendee.name}
+                      </td>
+                      <td className="px-3 py-3 text-center bg-background">
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <Button 
+                              variant="outline" 
+                              size="sm"
+                              className="h-8"
+                              disabled={quickActionMode !== null}
+                            >
+                              {attendee.roles && attendee.roles.length > 0 ? (
+                                <span className="flex items-center gap-1">
+                                  {attendee.roles.length === 1 ? (
+                                    <>
+                                      {getRoleIcon(attendee.roles[0])}
+                                      {attendee.roles[0]}
+                                    </>
+                                  ) : (
+                                    `${attendee.roles.length} roles`
+                                  )}
+                                </span>
+                              ) : (
+                                "No roles"
+                              )}
+                            </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent>
+                            <DropdownMenuItem onClick={() => toggleRole(attendee.id, "Organizer")}>
+                              <div className="flex items-center gap-2 w-full">
+                                <Users className="h-4 w-4" />
+                                <span className="flex-1">Organizer</span>
+                                {attendee.roles?.includes("Organizer") && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toggleRole(attendee.id, "Speaker")}>
+                              <div className="flex items-center gap-2 w-full">
+                                <Mic className="h-4 w-4" />
+                                <span className="flex-1">Speaker</span>
+                                {attendee.roles?.includes("Speaker") && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => toggleRole(attendee.id, "Attendee")}>
+                              <div className="flex items-center gap-2 w-full">
+                                <UserCircle className="h-4 w-4" />
+                                <span className="flex-1">Attendee</span>
+                                {attendee.roles?.includes("Attendee") && (
+                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
+                                )}
+                              </div>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </td>
+                      <td className="px-3 py-3 text-center bg-background">
+                        {exempt ? (
+                          <div className="flex items-center justify-center">
+                            <span className={`px-3 py-1 rounded-md border text-xs ${getPaymentStatusColor(attendee.payment_status, attendee.roles)}`}>
+                              N/A
+                            </span>
+                          </div>
+                        ) : (
+                          <Select
+                            value={attendee.payment_status || "Pending"}
+                            onValueChange={(value) => updatePaymentStatus(attendee.id, value)}
+                            disabled={quickActionMode !== null}
+                          >
+                            <SelectTrigger className={`w-[140px] mx-auto text-xs ${getPaymentStatusColor(attendee.payment_status, attendee.roles)}`}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Pending">
+                                <div className="flex items-center gap-2">
+                                  <Clock className="h-3 w-3" />
+                                  Pending
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Partially Paid">
+                                <div className="flex items-center gap-2">
+                                  <TrendingUp className="h-3 w-3" />
+                                  Partially Paid
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Fully Paid">
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-3 w-3" />
+                                  Fully Paid
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        )}
+                      </td>
+                      
+                      {scheduleDates.map((d) => (
+                        <td key={d.date} className="px-3 py-3">
+                          <Button
+                            variant="ghost"
+                            onClick={() => toggleAttendance(attendee.id, d.date)}
+                            disabled={quickActionMode !== null}
+                            className={`rounded-full px-3 py-1 border text-xs cursor-pointer whitespace-nowrap ${
+                              getStatusDisplay(attendee, d.date) === "Present"
+                                ? "bg-green-100 text-green-700 hover:bg-green-200"
+                                : getStatusDisplay(attendee, d.date) === "Absent"
+                                ? "bg-red-100 text-red-700 hover:bg-red-200"
+                                : "bg-muted text-muted-foreground hover:bg-muted/80"
+                            }`}
+                          >
+                            {getStatusDisplay(attendee, d.date)} <Calendar className="ml-1 h-3 w-3" />
+                          </Button>
+                        </td>
+                      ))}
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>

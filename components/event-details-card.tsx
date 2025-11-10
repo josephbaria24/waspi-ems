@@ -1,3 +1,4 @@
+//components\event-details-card.tsx
 "use client"
 
 import { useState } from "react"
