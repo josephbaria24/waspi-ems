@@ -113,9 +113,11 @@ export async function POST(req: Request) {
           html: `
             <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
               <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; overflow: hidden;">
-                <div style="background-color: #1e1b4b; text-align: center; padding: 20px;">
-                  <img src="https://waspi.ph/wp-content/uploads/2024/09/cropped-WASPI-Logo-Header-2024-515x84.png" alt="WASPI Logo" style="height: 50px;" />
-                </div>
+              <div style="background-color: #ffffff; text-align: center; padding: 20px; border: 3px solid #1e1b4b;border-radius: 10px;">
+              <img src="https://waspi.ph/wp-content/uploads/2024/09/cropped-WASPI-Logo-Header-2024-515x84.png" 
+                   alt="WASPI Logo" 
+                   style="height: 80px;" />
+            </div>
                 <div style="padding: 30px; color: #333;">
                   <h2>Hi, ${attendee.personal_name} ${attendee.last_name}!</h2>
                   <p>
@@ -131,6 +133,9 @@ export async function POST(req: Request) {
                       Take Evaluation
                     </a>
                   </div>
+                  <p style="margin-top: 30px; color: #666; font-size: 14px;">
+                  If you have any questions, please don't hesitate to contact info@waspi.ph.
+                </p>
                 </div>
               </div>
             </div>

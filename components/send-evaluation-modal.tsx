@@ -5,13 +5,13 @@ import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { CheckCircle2, XCircle, Loader2, Clock, TrendingUp } from "lucide-react"
+import { CheckCircle2, XCircle, Loader2, Clock, TrendingUp, Users } from "lucide-react"
 
 interface SendEvaluationsModalProps {
   eventId: number
   open: boolean
   onClose: () => void
-  supabase: any // Pass supabase client as prop
+  supabase: any
 }
 
 interface SendResult {
@@ -26,15 +26,23 @@ interface Attendee {
   email: string
   hassentevaluation: boolean
   payment_status?: string
+  roles?: string[]
+  attendance?: Record<string, boolean> | null
 }
 
-export default function SendEvaluationsModal({ eventId, open, onClose, supabase }: SendEvaluationsModalProps) {
+export default function SendEvaluationsModal({
+  eventId,
+  open,
+  onClose,
+  supabase,
+}: SendEvaluationsModalProps) {
   const [attendees, setAttendees] = useState<Attendee[]>([])
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [loading, setLoading] = useState(false)
   const [sending, setSending] = useState(false)
   const [searchQuery, setSearchQuery] = useState("")
   const [result, setResult] = useState<SendResult | null>(null)
+  const [showOnlyAttendees, setShowOnlyAttendees] = useState(false)
 
   // Fetch attendees
   useEffect(() => {
@@ -43,25 +51,40 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
       setLoading(true)
       const { data, error } = await supabase
         .from("attendees")
-        .select("id, personal_name, last_name, email, hassentevaluation, payment_status")
+        .select(
+          "id, personal_name, last_name, email, hassentevaluation, payment_status, roles, attendance"
+        )
         .eq("event_id", eventId)
       if (!error && data) setAttendees(data)
       setLoading(false)
     }
     fetchAttendees()
-    // Reset states when modal opens
     setResult(null)
   }, [eventId, open, supabase])
 
-  // Filter attendees based on search
-  const filteredAttendees = attendees.filter(a => {
-    const fullName = `${a.last_name || ''}, ${a.personal_name || ''}`.toLowerCase()
-    const email = (a.email || '').toLowerCase()
-    const query = searchQuery.toLowerCase()
-    return fullName.includes(query) || email.includes(query)
-  })
+  // Helper for days present
+  const countDaysPresent = (attendance: Record<string, boolean> | null | undefined) => {
+    if (!attendance) return 0
+    return Object.values(attendance).filter(Boolean).length
+  }
 
-  // Select all toggle (filtered)
+  // Filter logic
+  const filteredAttendees = attendees
+    .filter(a => {
+      const fullName = `${a.last_name || ""}, ${a.personal_name || ""}`.toLowerCase()
+      const email = (a.email || "").toLowerCase()
+      const query = searchQuery.toLowerCase()
+      return fullName.includes(query) || email.includes(query)
+    })
+    .filter(a => {
+      if (!showOnlyAttendees) return true
+      const days = countDaysPresent(a.attendance)
+      const roles = a.roles || []
+      const isAttendee = roles.some(r => r.toLowerCase() === "attendee")
+      return isAttendee && days > 0
+    })
+
+  // Select toggles
   const toggleSelectAll = () => {
     const filteredIds = filteredAttendees.map(a => a.id)
     if (filteredIds.every(id => selectedIds.includes(id))) {
@@ -71,12 +94,13 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
     }
   }
 
-  // Individual checkbox toggle
   const toggleSelect = (id: number) => {
-    setSelectedIds(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+    setSelectedIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    )
   }
 
-  // Send emails
+  // Email sending
   const sendEmails = async () => {
     if (!selectedIds.length) {
       alert("Please select at least one attendee.")
@@ -95,11 +119,8 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
     const data = await res.json()
     setSending(false)
 
-    if (res.ok) {
-      setResult(data.result)
-    } else {
-      alert(`❌ Error: ${data.error || "Failed to send emails."}`)
-    }
+    if (res.ok) setResult(data.result)
+    else alert(`❌ Error: ${data.error || "Failed to send emails."}`)
   }
 
   const handleClose = () => {
@@ -108,9 +129,9 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
     onClose()
   }
 
+  // Badge helper
   const getPaymentStatusBadge = (status?: string) => {
     const statusValue = status || "Pending"
-    
     switch (statusValue) {
       case "Fully Paid":
         return (
@@ -126,7 +147,6 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
             Partial
           </span>
         )
-      case "Pending":
       default:
         return (
           <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-300">
@@ -139,18 +159,35 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
-      <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col rounded-xl">
-        <DialogHeader>
-          <DialogTitle>Send Evaluations</DialogTitle>
+      <DialogContent className="max-w-6xl max-h-[80vh] flex flex-col rounded-xl bg-white shadow-lg">
+        <DialogHeader className="border-b pb-2 bg-white">
+          <div className="flex justify-between items-center">
+            <DialogTitle className="text-lg font-bold text-[#1e1b4b]">
+              Send Evaluations
+            </DialogTitle>
+
+            {/* Action button to toggle visibility */}
+            <Button
+              variant={showOnlyAttendees ? "secondary" : "outline"}
+              onClick={() => setShowOnlyAttendees(!showOnlyAttendees)}
+              className={`flex items-center gap-2 ${
+                showOnlyAttendees
+                  ? "bg-[#1e1b4b] text-white hover:bg-[#2c2970]"
+                  : "text-[#1e1b4b] border-[#1e1b4b]"
+              }`}
+            >
+              <Users className="h-4 w-4" />
+              {showOnlyAttendees ? "Show All" : "Hide Non-Attendees"}
+            </Button>
+          </div>
         </DialogHeader>
 
         {loading ? (
-          <p>Loading attendees...</p>
+          <p className="text-center py-6 text-gray-600">Loading attendees...</p>
         ) : result ? (
-          // Show results
-          <div className="flex flex-col gap-4 overflow-auto">
+          // ✅ Results View
+          <div className="flex flex-col gap-4 overflow-auto bg-white">
             <div className="space-y-3">
-              {/* Success section */}
               {result.successful.length > 0 && (
                 <Alert className="border-green-200 bg-green-50">
                   <CheckCircle2 className="h-4 w-4 text-green-600" />
@@ -159,7 +196,7 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
                       Successfully sent to {result.successful.length} attendee(s)
                     </div>
                     <div className="max-h-40 overflow-y-auto space-y-1">
-                      {result.successful.map((item) => (
+                      {result.successful.map(item => (
                         <div key={item.id} className="text-sm text-green-700">
                           • {item.name} ({item.email})
                         </div>
@@ -168,8 +205,6 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
                   </AlertDescription>
                 </Alert>
               )}
-
-              {/* Failed section */}
               {result.failed.length > 0 && (
                 <Alert className="border-red-200 bg-red-50">
                   <XCircle className="h-4 w-4 text-red-600" />
@@ -178,7 +213,7 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
                       ❌ Failed to send to {result.failed.length} attendee(s)
                     </div>
                     <div className="max-h-40 overflow-y-auto space-y-2">
-                      {result.failed.map((item) => (
+                      {result.failed.map(item => (
                         <div key={item.id} className="text-sm">
                           <div className="font-medium text-red-700">
                             • {item.name} ({item.email})
@@ -193,27 +228,25 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
                 </Alert>
               )}
             </div>
-
-            <div className="flex justify-end gap-3 pt-4 border-t">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200">
               <Button onClick={handleClose}>Close</Button>
             </div>
           </div>
         ) : (
-          <div className="flex flex-col h-full min-h-0">
-            {/* Search bar */}
+          // ✅ Main Table View
+          <div className="flex flex-col h-full min-h-0 bg-white">
             <div className="mb-4">
               <Input
                 type="text"
                 placeholder="Search by name or email..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={e => setSearchQuery(e.target.value)}
                 className="w-full"
                 disabled={sending}
               />
             </div>
 
-            {/* Select all */}
-            <div className="flex items-center gap-2 border-b pb-3 mb-2">
+            <div className="flex items-center gap-2 border-b pb-3 mb-2 border-gray-200">
               <input
                 type="checkbox"
                 checked={
@@ -222,50 +255,37 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
                 }
                 onChange={toggleSelectAll}
                 disabled={sending}
+                className="accent-[#1e1b4b]"
               />
-              <span className="font-medium">Select All</span>
+              <span className="font-medium text-[#1e1b4b]">Select All</span>
               <span className="text-sm text-gray-500 ml-auto">
                 {selectedIds.length} selected
               </span>
             </div>
 
-            {/* Progress indicator */}
-            {sending && (
-              <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <div className="flex items-center gap-2 text-blue-700">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  <span className="text-sm font-medium">
-                    Sending emails to {selectedIds.length} attendee(s)... Please wait.
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Scrollable attendee list */}
-            <div className="flex-1 overflow-y-auto border rounded-lg min-h-0">
-              {/* Table Header */}
-              <div className="sticky top-0 bg-gray-50 border-b font-semibold text-sm">
+            {/* Table */}
+            <div className="flex-1 overflow-y-auto border border-gray-200 rounded-lg min-h-0">
+              <div className="sticky top-0 bg-[#f9fafb] border-b border-gray-200 font-semibold text-sm text-[#1e1b4b]">
                 <div className="grid grid-cols-12 gap-4 px-4 py-3">
-                  <div className="col-span-1 flex items-center">
-                    <span className="sr-only">Checkbox</span>
-                  </div>
-                  <div className="col-span-5">Name</div>
-                  <div className="col-span-4">Email</div>
+                  <div className="col-span-1">#</div>
+                  <div className="col-span-3">Name</div>
+                  <div className="col-span-3">Email</div>
+                  <div className="col-span-2 text-center">Role(s)</div>
+                  <div className="col-span-1 text-center">Days Present</div>
                   <div className="col-span-2 text-center">Payment</div>
                 </div>
               </div>
 
-              {/* Table Body */}
               {filteredAttendees.length === 0 ? (
                 <div className="px-4 py-8 text-center text-gray-500">
                   No attendees found
                 </div>
               ) : (
-                <div className="divide-y">
+                <div className="divide-y divide-gray-100">
                   {filteredAttendees.map((a, i) => (
                     <div
                       key={a.id}
-                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 items-center"
+                      className="grid grid-cols-12 gap-4 px-4 py-3 hover:bg-gray-50 items-center transition"
                     >
                       <div className="col-span-1 flex items-center gap-2">
                         <input
@@ -273,20 +293,31 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
                           checked={selectedIds.includes(a.id)}
                           onChange={() => toggleSelect(a.id)}
                           disabled={sending}
-                          className="cursor-pointer"
+                          className="accent-[#1e1b4b]"
                         />
                         <span className="text-sm text-gray-500">{i + 1}</span>
                       </div>
-                      <div className="col-span-5">
-                        <span className="font-medium">
-                          {a.last_name}, {a.personal_name}
-                        </span>
+
+                      <div className="col-span-3 font-medium text-[#1e1b4b]">
+                        {a.last_name}, {a.personal_name}
                       </div>
-                      <div className="col-span-4">
-                        <span className="text-sm text-gray-600 truncate block">
-                          {a.email || <span className="text-red-500 italic">No email</span>}
-                        </span>
+
+                      <div className="col-span-3 text-sm text-gray-700 truncate">
+                        {a.email || <span className="text-red-500 italic">No email</span>}
                       </div>
+
+                      <div className="col-span-2 text-center">
+                        {a.roles && a.roles.length > 0 ? (
+                          <span className="text-xs text-gray-700">{a.roles.join(", ")}</span>
+                        ) : (
+                          <span className="text-gray-400 text-xs italic">—</span>
+                        )}
+                      </div>
+
+                      <div className="col-span-1 text-center text-sm text-gray-700">
+                        {countDaysPresent(a.attendance)}
+                      </div>
+
                       <div className="col-span-2 flex justify-center">
                         {getPaymentStatusBadge(a.payment_status)}
                       </div>
@@ -296,12 +327,15 @@ export default function SendEvaluationsModal({ eventId, open, onClose, supabase 
               )}
             </div>
 
-            {/* Action buttons */}
-            <div className="flex justify-end gap-3 pt-4 border-t mt-4">
+            <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 mt-4">
               <Button variant="outline" onClick={handleClose} disabled={sending}>
                 Cancel
               </Button>
-              <Button onClick={sendEmails} disabled={sending}>
+              <Button
+                onClick={sendEmails}
+                disabled={sending}
+                className="bg-[#1e1b4b] text-white hover:bg-[#2c2970]"
+              >
                 {sending ? (
                   <>
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />

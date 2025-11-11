@@ -12,6 +12,7 @@ import SendEvaluationsModal from "@/components/send-evaluation-modal"
 import CertificateTemplateModal from "@/components/certificate-template-modal"
 import ExportAttendeesModal from "@/components/export-attendees-modal"
 import DownloadCertificatesModal from "@/components/download-certificates-modal"
+import SendDirectCertificateModal from "@/components/send-direct-certificate-modal"
 import { supabase } from "@/lib/supabase-client"
 
 // Extended Event type with stats
@@ -51,11 +52,13 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showDownloadCertificatesModal, setShowDownloadCertificatesModal] = useState(false)
+  const [showSendDirectCertificateModal, setShowSendDirectCertificateModal] = useState(false)
 
   const actions = [
     { label: "Open Registration", icon: UserPlus },
     { label: "Edit Certificate Template", icon: Palette },
     { label: "Send Evaluations", icon: Mail },
+    { label: "Send Direct Certificate", icon: Award },
     { label: "Export Attendees", icon: Download },
     { label: "Download Certificates", icon: Award },
     { label: "Download Badges", icon: FileUp },
@@ -106,6 +109,9 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
                       }
                       if (action.label === "Download Certificates") {
                         setShowDownloadCertificatesModal(true)
+                      }
+                      if (action.label === "Send Direct Certificate") {
+                        setShowSendDirectCertificateModal(true)
                       }
                     }}
                   >
@@ -395,6 +401,14 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
         eventName={event.name}
         open={showDownloadCertificatesModal}
         onClose={() => setShowDownloadCertificatesModal(false)}
+      />
+
+      <SendDirectCertificateModal
+        eventId={Number(event.id)}
+        eventName={event.name}
+        scheduleDates={editedEvent.schedule || []}
+        open={showSendDirectCertificateModal}
+        onClose={() => setShowSendDirectCertificateModal(false)}
       />
     </Card>
   )

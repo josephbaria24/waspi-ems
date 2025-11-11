@@ -1,4 +1,4 @@
-//app/api/send-certificate/route.ts
+//app/api/send-direct-certificate/route.ts
 import { NextResponse } from "next/server";
 import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
@@ -41,8 +41,7 @@ async function generateCertificatePDF(
   templateType: "participation" | "awardee" | "attendance" = "participation"
 ): Promise<Buffer> {
   try {
-    // Get custom template from database
-    console.log(`Fetching template for event ID: ${eventId}`);
+    console.log(`Fetching ${templateType} template for event ID: ${eventId}`);
     
     const { data: template, error: templateError } = await supabase
       .from("certificate_templates")
@@ -53,39 +52,26 @@ async function generateCertificatePDF(
 
     if (templateError) {
       console.error("Error fetching template:", templateError);
+      throw new Error("Template not found");
     }
 
-    if (template) {
-      console.log("Template found:", {
-        id: template.id,
-        imageUrl: template.image_url?.substring(0, 50),
-        fieldsCount: template.fields?.length || 0
-      });
-    } else {
-      console.log("No custom template found, using defaults");
+    if (!template) {
+      throw new Error(`${templateType} template not configured for this event`);
     }
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([792, 612]); // Letter/Short bond paper landscape (11" x 8.5")
+    const page = pdfDoc.addPage([792, 612]);
 
     // Load template image
-let templateImageBytes: ArrayBuffer | Buffer;
+    let templateImageBytes: ArrayBuffer | Buffer;
     
     if (template?.image_url) {
-      console.log("Fetching custom template from:", template.image_url);
-      
-      // Fetch the image from URL
       const response = await fetch(template.image_url);
       if (!response.ok) {
-        console.error(`Failed to fetch template: ${response.status} ${response.statusText}`);
         throw new Error(`Failed to fetch template image: ${response.statusText}`);
       }
       templateImageBytes = await response.arrayBuffer();
-      console.log("Template image fetched successfully");
     } else {
-      console.log("Using default template from public folder");
-      
-      // Fallback to default template
       const templatePath = path.join(process.cwd(), "public", "certificate-template.png");
       templateImageBytes = await fs.readFile(templatePath);
     }
@@ -98,7 +84,6 @@ let templateImageBytes: ArrayBuffer | Buffer;
       height: 612,
     });
 
-    // Use custom fields if available, otherwise use defaults
     const fields = template?.fields && Array.isArray(template.fields) && template.fields.length > 0 
       ? template.fields 
       : [
@@ -137,20 +122,10 @@ let templateImageBytes: ArrayBuffer | Buffer;
           }
         ];
 
-    console.log(`Using ${fields.length} text fields:`, fields.map((f: any) => ({ 
-      label: f.label, 
-      x: f.x, 
-      y: f.y, 
-      fontSize: f.fontSize 
-    })));
-
-    // Load fonts
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
 
-    // Draw each text field
     for (const field of fields) {
-      // Replace placeholders
       let text = field.value
         .replace(/\{\{attendee_name\}\}/g, attendeeName)
         .replace(/\{\{event_name\}\}/g, eventName)
@@ -168,8 +143,6 @@ let templateImageBytes: ArrayBuffer | Buffer;
         x = field.x - textWidth;
       }
 
-      // Convert Y coordinate from canvas (top=0) to PDF (bottom=0)
-      // Canvas Y is measured from top, PDF Y is measured from bottom
       const pdfY = 612 - field.y;
 
       page.drawText(text, {
@@ -197,15 +170,6 @@ function isValidEmail(email: string): boolean {
   return emailRegex.test(email);
 }
 
-// Capitalize first letter of each word
-function capitalizeWords(str: string): string {
-  return str
-    .toLowerCase()
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
 function formatEventDate(startDate: string, endDate: string): string {
   const start = new Date(startDate);
   const end = new Date(endDate);
@@ -228,9 +192,22 @@ function formatEventDate(startDate: string, endDate: string): string {
   }
 }
 
+function getTemplateTypeLabel(templateType: string): string {
+  switch (templateType) {
+    case "participation":
+      return "Participation";
+    case "awardee":
+      return "Award";
+    case "attendance":
+      return "Attendance";
+    default:
+      return "Participation";
+  }
+}
+
 export async function POST(req: Request) {
   try {
-    const { referenceId } = await req.json();
+    const { referenceId, templateType = "participation" } = await req.json();
 
     if (!referenceId) {
       return NextResponse.json(
@@ -239,7 +216,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`Processing certificate for reference: ${referenceId}`);
+    console.log(`Processing ${templateType} certificate for reference: ${referenceId}`);
 
     const { data: attendee, error: attendeeError } = await supabase
       .from("attendees")
@@ -263,33 +240,29 @@ export async function POST(req: Request) {
       );
     }
 
-    if (!attendee.hasevaluation) {
-      return NextResponse.json(
-        { error: "Evaluation not completed" },
-        { status: 400 }
-      );
-    }
-
     const event = attendee.events;
     const fullName = `${attendee.personal_name} ${attendee.last_name}`;
     const eventDate = formatEventDate(event.start_date, event.end_date);
 
-    console.log(`Generating certificate for: ${fullName}, Event ID: ${event.id}`);
+    console.log(`Generating ${templateType} certificate for: ${fullName}, Event ID: ${event.id}`);
 
     const certificatePDF = await generateCertificatePDF(
       fullName,
       event.name,
       eventDate,
       event.venue || "Philippines",
-      event.id
+      event.id,
+      templateType as "participation" | "awardee" | "attendance"
     );
 
     console.log("Certificate PDF generated successfully");
 
+    const certificateLabel = getTemplateTypeLabel(templateType);
+
     const mailOptions = {
       from: `"WASPI" <no-reply@waspi.ph>`,
       to: email,
-      subject: `Certificate of Participation - ${event.name}`,
+      subject: `Certificate of ${certificateLabel} - ${event.name}`,
       html: `
         <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
           <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; overflow: hidden;">
@@ -298,16 +271,14 @@ export async function POST(req: Request) {
                alt="WASPI Logo" 
                style="height: 80px;" />
         </div>
+        
             <div style="padding: 30px; color: #333;">
               <h2>Congratulations, ${attendee.personal_name} ${attendee.last_name}!</h2>
               <p>
-                Thank you for completing the evaluation for <strong>${event.name}</strong>.
-              </p>
-              <p>
-                Please find attached your <strong>Certificate of Participation</strong>.
+                Please find attached your <strong>Certificate of ${certificateLabel}</strong> for <strong>${event.name}</strong>.
               </p>
               <p style="margin-top: 30px; color: #666; font-size: 14px;">
-                If you have any questions, please don't hesitate to contact info@waspi.ph
+                If you have any questions, please don't hesitate to contact info@waspi.ph.
               </p>
             </div>
             <div style="background-color: #f9fafb; padding: 20px; text-align: center; color: #666; font-size: 12px;">
@@ -318,7 +289,7 @@ export async function POST(req: Request) {
       `,
       attachments: [
         {
-          filename: `Certificate_${fullName.replace(/\s+/g, "_")}.pdf`,
+          filename: `Certificate_${certificateLabel}_${fullName.replace(/\s+/g, "_")}.pdf`,
           content: certificatePDF,
           contentType: "application/pdf",
         },
@@ -334,7 +305,7 @@ export async function POST(req: Request) {
       message: "Certificate sent successfully",
     });
   } catch (error: any) {
-    console.error("❌ Send Certificate Error:", error);
+    console.error("❌ Send Direct Certificate Error:", error);
     return NextResponse.json(
       { error: "Failed to send certificate", details: error.message },
       { status: 500 }

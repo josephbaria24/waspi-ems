@@ -38,6 +38,9 @@ export async function POST(req: Request) {
             <p><strong>Reference ID:</strong> ${reference_id}</p>
           </div>
         </div>
+        <p style="margin-top: 30px; color: #666; font-size: 14px;">
+        If you have any questions, please don't hesitate to contact info@waspi.ph.
+      </p>
       </div>
     `
 
