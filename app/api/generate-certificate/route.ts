@@ -1,6 +1,5 @@
-//app/api/send-certificate/route.ts
+//app/api/generate-certificate/route.ts
 import { NextResponse } from "next/server";
-import nodemailer from "nodemailer";
 import { createClient } from "@supabase/supabase-js";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs/promises";
@@ -11,16 +10,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-const transporter = nodemailer.createTransport({
-  host: "smtp.hostinger.com",
-  port: 465,
-  secure: true,
-  auth: {
-    user: "no-reply@waspi.ph",
-    pass: "@Notsotrickypassword123",
-  },
-});
-
 function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
@@ -30,6 +19,28 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
         b: parseInt(result[3], 16) / 255,
       }
     : { r: 0, g: 0, b: 0 };
+}
+
+function formatEventDate(startDate: string, endDate: string): string {
+  const start = new Date(startDate);
+  const end = new Date(endDate);
+  
+  const options: Intl.DateTimeFormatOptions = { 
+    year: 'numeric', 
+    month: 'long', 
+    day: 'numeric' 
+  };
+  
+  if (start.toDateString() === end.toDateString()) {
+    return start.toLocaleDateString('en-US', options);
+  } else {
+    const startFormatted = start.toLocaleDateString('en-US', { 
+      month: 'long', 
+      day: 'numeric' 
+    });
+    const endFormatted = end.toLocaleDateString('en-US', options);
+    return `${startFormatted}-${endFormatted.split(' ')[1]}, ${end.getFullYear()}`;
+  }
 }
 
 async function generateCertificatePDF(
@@ -55,26 +66,15 @@ async function generateCertificatePDF(
       console.error("Error fetching template:", templateError);
     }
 
-    if (template) {
-      console.log("Template found:", {
-        id: template.id,
-        imageUrl: template.image_url?.substring(0, 50),
-        fieldsCount: template.fields?.length || 0
-      });
-    } else {
-      console.log("No custom template found, using defaults");
-    }
-
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([792, 612]); // Letter/Short bond paper landscape (11" x 8.5")
+    const page = pdfDoc.addPage([842, 595]);
 
     // Load template image
-let templateImageBytes: ArrayBuffer | Buffer;
+    let templateImageBytes: ArrayBuffer | Buffer;
     
     if (template?.image_url) {
       console.log("Fetching custom template from:", template.image_url);
       
-      // Fetch the image from URL
       const response = await fetch(template.image_url);
       if (!response.ok) {
         console.error(`Failed to fetch template: ${response.status} ${response.statusText}`);
@@ -85,7 +85,6 @@ let templateImageBytes: ArrayBuffer | Buffer;
     } else {
       console.log("Using default template from public folder");
       
-      // Fallback to default template
       const templatePath = path.join(process.cwd(), "public", "certificate-template.png");
       templateImageBytes = await fs.readFile(templatePath);
     }
@@ -94,8 +93,8 @@ let templateImageBytes: ArrayBuffer | Buffer;
     page.drawImage(templateImage, {
       x: 0,
       y: 0,
-      width: 792,
-      height: 612,
+      width: 842,
+      height: 595,
     });
 
     // Use custom fields if available, otherwise use defaults
@@ -106,7 +105,7 @@ let templateImageBytes: ArrayBuffer | Buffer;
             id: "name",
             label: "Attendee Name",
             value: "{{attendee_name}}",
-            x: 396,
+            x: 421,
             y: 335,
             fontSize: 36,
             fontWeight: "bold",
@@ -117,7 +116,7 @@ let templateImageBytes: ArrayBuffer | Buffer;
             id: "event",
             label: "Event Name",
             value: "for having attended the {{event_name}}",
-            x: 396,
+            x: 421,
             y: 275,
             fontSize: 14,
             fontWeight: "normal",
@@ -128,7 +127,7 @@ let templateImageBytes: ArrayBuffer | Buffer;
             id: "date",
             label: "Event Date",
             value: "conducted on {{event_date}} at {{event_venue}}",
-            x: 396,
+            x: 421,
             y: 250,
             fontSize: 14,
             fontWeight: "normal",
@@ -136,13 +135,6 @@ let templateImageBytes: ArrayBuffer | Buffer;
             align: "center"
           }
         ];
-
-    console.log(`Using ${fields.length} text fields:`, fields.map((f: any) => ({ 
-      label: f.label, 
-      x: f.x, 
-      y: f.y, 
-      fontSize: f.fontSize 
-    })));
 
     // Load fonts
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -169,8 +161,7 @@ let templateImageBytes: ArrayBuffer | Buffer;
       }
 
       // Convert Y coordinate from canvas (top=0) to PDF (bottom=0)
-      // Canvas Y is measured from top, PDF Y is measured from bottom
-      const pdfY = 612 - field.y;
+      const pdfY = 595 - field.y;
 
       page.drawText(text, {
         x: x,
@@ -189,45 +180,6 @@ let templateImageBytes: ArrayBuffer | Buffer;
   }
 }
 
-function isValidEmail(email: string): boolean {
-  if (!email || typeof email !== "string") return false;
-  email = email.trim();
-  if (email.includes(" ")) return false;
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-  return emailRegex.test(email);
-}
-
-// Capitalize first letter of each word
-function capitalizeWords(str: string): string {
-  return str
-    .toLowerCase()
-    .split(' ')
-    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(' ');
-}
-
-function formatEventDate(startDate: string, endDate: string): string {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  
-  const options: Intl.DateTimeFormatOptions = { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  };
-  
-  if (start.toDateString() === end.toDateString()) {
-    return start.toLocaleDateString('en-US', options);
-  } else {
-    const startFormatted = start.toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric' 
-    });
-    const endFormatted = end.toLocaleDateString('en-US', options);
-    return `${startFormatted}-${endFormatted.split(' ')[1]}, ${end.getFullYear()}`;
-  }
-}
-
 export async function POST(req: Request) {
   try {
     const { referenceId } = await req.json();
@@ -239,7 +191,7 @@ export async function POST(req: Request) {
       );
     }
 
-    console.log(`Processing certificate for reference: ${referenceId}`);
+    console.log(`Generating certificate for reference: ${referenceId}`);
 
     const { data: attendee, error: attendeeError } = await supabase
       .from("attendees")
@@ -252,21 +204,6 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: "Attendee not found" },
         { status: 404 }
-      );
-    }
-
-    const email = attendee.email?.trim();
-    if (!email || !isValidEmail(email)) {
-      return NextResponse.json(
-        { error: "Invalid email address" },
-        { status: 400 }
-      );
-    }
-
-    if (!attendee.hasevaluation) {
-      return NextResponse.json(
-        { error: "Evaluation not completed" },
-        { status: 400 }
       );
     }
 
@@ -286,55 +223,17 @@ export async function POST(req: Request) {
 
     console.log("Certificate PDF generated successfully");
 
-    const mailOptions = {
-      from: `"WASPI" <no-reply@waspi.ph>`,
-      to: email,
-      subject: `Certificate of Participation - ${event.name}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
-          <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; overflow: hidden;">
-            <div style="background-color: #1e1b4b; text-align: center; padding: 20px;">
-              <img src="https://waspi.ph/wp-content/uploads/2024/09/cropped-WASPI-Logo-Header-2024-515x84.png" alt="WASPI Logo" style="height: 50px;" />
-            </div>
-            <div style="padding: 30px; color: #333;">
-              <h2>Congratulations, ${attendee.personal_name} ${attendee.last_name}!</h2>
-              <p>
-                Thank you for completing the evaluation for <strong>${event.name}</strong>.
-              </p>
-              <p>
-                Please find attached your <strong>Certificate of Participation</strong>.
-              </p>
-              <p style="margin-top: 30px; color: #666; font-size: 14px;">
-                If you have any questions, please don't hesitate to contact us.
-              </p>
-            </div>
-            <div style="background-color: #f9fafb; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-              <p>© ${new Date().getFullYear()} WASPI. All rights reserved.</p>
-            </div>
-          </div>
-        </div>
-      `,
-      attachments: [
-        {
-          filename: `Certificate_${fullName.replace(/\s+/g, "_")}.pdf`,
-          content: certificatePDF,
-          contentType: "application/pdf",
-        },
-      ],
-    };
-
-    await transporter.sendMail(mailOptions);
-
-    console.log(`Certificate sent successfully to: ${email}`);
-
-    return NextResponse.json({
-      success: true,
-      message: "Certificate sent successfully",
+    // Return the PDF as a downloadable file
+    return new NextResponse(certificatePDF, {
+      headers: {
+        "Content-Type": "application/pdf",
+        "Content-Disposition": `attachment; filename="Certificate_${fullName.replace(/\s+/g, "_")}.pdf"`,
+      },
     });
   } catch (error: any) {
-    console.error("❌ Send Certificate Error:", error);
+    console.error("❌ Generate Certificate Error:", error);
     return NextResponse.json(
-      { error: "Failed to send certificate", details: error.message },
+      { error: "Failed to generate certificate", details: error.message },
       { status: 500 }
     );
   }

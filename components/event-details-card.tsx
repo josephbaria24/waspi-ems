@@ -1,4 +1,4 @@
-//components\event-details-card.tsx
+//components/event-details-card.tsx
 "use client"
 
 import { useState } from "react"
@@ -11,6 +11,7 @@ import type { Event } from "@/types/event"
 import SendEvaluationsModal from "@/components/send-evaluation-modal"
 import CertificateTemplateModal from "@/components/certificate-template-modal"
 import ExportAttendeesModal from "@/components/export-attendees-modal"
+import DownloadCertificatesModal from "@/components/download-certificates-modal"
 import { supabase } from "@/lib/supabase-client"
 
 // Extended Event type with stats
@@ -49,6 +50,7 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
   const [showSendEvaluationsModal, setShowSendEvaluationsModal] = useState(false)
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
+  const [showDownloadCertificatesModal, setShowDownloadCertificatesModal] = useState(false)
 
   const actions = [
     { label: "Open Registration", icon: UserPlus },
@@ -101,6 +103,9 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
                       }
                       if (action.label === "Export Attendees") {
                         setShowExportModal(true)
+                      }
+                      if (action.label === "Download Certificates") {
+                        setShowDownloadCertificatesModal(true)
                       }
                     }}
                   >
@@ -383,6 +388,13 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
         eventName={event.name}
         open={showExportModal}
         onClose={() => setShowExportModal(false)}
+      />
+
+      <DownloadCertificatesModal
+        eventId={Number(event.id)}
+        eventName={event.name}
+        open={showDownloadCertificatesModal}
+        onClose={() => setShowDownloadCertificatesModal(false)}
       />
     </Card>
   )
