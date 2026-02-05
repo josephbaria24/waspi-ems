@@ -13,6 +13,7 @@ import CertificateTemplateModal from "@/components/certificate-template-modal"
 import ExportAttendeesModal from "@/components/export-attendees-modal"
 import DownloadCertificatesModal from "@/components/download-certificates-modal"
 import SendDirectCertificateModal from "@/components/send-direct-certificate-modal"
+import AddAttendeeModal from "@/components/add-attendee-modal"
 import { supabase } from "@/lib/supabase-client"
 
 // Extended Event type with stats
@@ -24,22 +25,22 @@ type EventWithStats = Omit<Event, "attendees"> & {
   }
 }
 
-export function EventDetailsCard({ event }: { event: EventWithStats }) {
+export function EventDetailsCard({ event, onAttendeeAdded }: { event: EventWithStats; onAttendeeAdded?: () => void }) {
   const [isEditing, setIsEditing] = useState(false)
   const [editedEvent, setEditedEvent] = useState(event)
   const [topicInput, setTopicInput] = useState("")
-  
+
   const handleSave = async () => {
     const { error } = await supabase
       .from('events')
-      .update({ 
+      .update({
         name: editedEvent.name,
         venue: editedEvent.venue,
         price: editedEvent.price,
         description: editedEvent.description
       })
       .eq('id', event.id)
-    
+
     if (error) {
       console.error('Error updating event:', error)
       alert('Failed to save changes')
@@ -47,14 +48,16 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
       setIsEditing(false)
     }
   }
-  
+
   const [showSendEvaluationsModal, setShowSendEvaluationsModal] = useState(false)
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [showExportModal, setShowExportModal] = useState(false)
   const [showDownloadCertificatesModal, setShowDownloadCertificatesModal] = useState(false)
   const [showSendDirectCertificateModal, setShowSendDirectCertificateModal] = useState(false)
+  const [showAddAttendeeModal, setShowAddAttendeeModal] = useState(false)
 
   const actions = [
+    { label: "Add New Attendee", icon: UserPlus },
     { label: "Open Registration", icon: UserPlus },
     { label: "Edit Certificate Template", icon: Palette },
     { label: "Send Evaluations", icon: Mail },
@@ -112,6 +115,9 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
                       }
                       if (action.label === "Send Direct Certificate") {
                         setShowSendDirectCertificateModal(true)
+                      }
+                      if (action.label === "Add New Attendee") {
+                        setShowAddAttendeeModal(true)
                       }
                     }}
                   >
@@ -380,7 +386,7 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
         eventId={Number(event.id)}
         open={showSendEvaluationsModal}
         onClose={() => setShowSendEvaluationsModal(false)}
-        supabase={supabase} 
+        supabase={supabase}
       />
 
       <CertificateTemplateModal
@@ -409,6 +415,14 @@ export function EventDetailsCard({ event }: { event: EventWithStats }) {
         scheduleDates={editedEvent.schedule || []}
         open={showSendDirectCertificateModal}
         onClose={() => setShowSendDirectCertificateModal(false)}
+      />
+
+      <AddAttendeeModal
+        eventId={Number(event.id)}
+        eventName={event.name}
+        open={showAddAttendeeModal}
+        onClose={() => setShowAddAttendeeModal(false)}
+        onAttendeeAdded={onAttendeeAdded}
       />
     </Card>
   )

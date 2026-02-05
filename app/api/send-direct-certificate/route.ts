@@ -25,10 +25,10 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   return result
     ? {
-        r: parseInt(result[1], 16) / 255,
-        g: parseInt(result[2], 16) / 255,
-        b: parseInt(result[3], 16) / 255,
-      }
+      r: parseInt(result[1], 16) / 255,
+      g: parseInt(result[2], 16) / 255,
+      b: parseInt(result[3], 16) / 255,
+    }
     : { r: 0, g: 0, b: 0 };
 }
 
@@ -42,7 +42,7 @@ async function generateCertificatePDF(
 ): Promise<Buffer> {
   try {
     console.log(`Fetching ${templateType} template for event ID: ${eventId}`);
-    
+
     const { data: template, error: templateError } = await supabase
       .from("certificate_templates")
       .select("*")
@@ -60,11 +60,11 @@ async function generateCertificatePDF(
     }
 
     const pdfDoc = await PDFDocument.create();
-    const page = pdfDoc.addPage([792, 612]);
+    const page = pdfDoc.addPage([842, 595]);
 
     // Load template image
     let templateImageBytes: ArrayBuffer | Buffer;
-    
+
     if (template?.image_url) {
       const response = await fetch(template.image_url);
       if (!response.ok) {
@@ -80,47 +80,47 @@ async function generateCertificatePDF(
     page.drawImage(templateImage, {
       x: 0,
       y: 0,
-      width: 792,
-      height: 612,
+      width: 842,
+      height: 595,
     });
 
-    const fields = template?.fields && Array.isArray(template.fields) && template.fields.length > 0 
-      ? template.fields 
+    const fields = template?.fields && Array.isArray(template.fields) && template.fields.length > 0
+      ? template.fields
       : [
-          {
-            id: "name",
-            label: "Attendee Name",
-            value: "{{attendee_name}}",
-            x: 396,
-            y: 335,
-            fontSize: 36,
-            fontWeight: "bold",
-            color: "#2C3E50",
-            align: "center"
-          },
-          {
-            id: "event",
-            label: "Event Name",
-            value: "for having attended the {{event_name}}",
-            x: 396,
-            y: 275,
-            fontSize: 14,
-            fontWeight: "normal",
-            color: "#34495E",
-            align: "center"
-          },
-          {
-            id: "date",
-            label: "Event Date",
-            value: "conducted on {{event_date}} at {{event_venue}}",
-            x: 396,
-            y: 250,
-            fontSize: 14,
-            fontWeight: "normal",
-            color: "#34495E",
-            align: "center"
-          }
-        ];
+        {
+          id: "name",
+          label: "Attendee Name",
+          value: "{{attendee_name}}",
+          x: 421,
+          y: 335,
+          fontSize: 36,
+          fontWeight: "bold",
+          color: "#2C3E50",
+          align: "center"
+        },
+        {
+          id: "event",
+          label: "Event Name",
+          value: "for having attended the {{event_name}}",
+          x: 421,
+          y: 275,
+          fontSize: 14,
+          fontWeight: "normal",
+          color: "#34495E",
+          align: "center"
+        },
+        {
+          id: "date",
+          label: "Event Date",
+          value: "conducted on {{event_date}} at {{event_venue}}",
+          x: 421,
+          y: 250,
+          fontSize: 14,
+          fontWeight: "normal",
+          color: "#34495E",
+          align: "center"
+        }
+      ];
 
     const helveticaBold = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
     const helvetica = await pdfDoc.embedFont(StandardFonts.Helvetica);
@@ -143,7 +143,7 @@ async function generateCertificatePDF(
         x = field.x - textWidth;
       }
 
-      const pdfY = 612 - field.y;
+      const pdfY = 595 - field.y;
 
       page.drawText(text, {
         x: x,
@@ -173,19 +173,19 @@ function isValidEmail(email: string): boolean {
 function formatEventDate(startDate: string, endDate: string): string {
   const start = new Date(startDate);
   const end = new Date(endDate);
-  
-  const options: Intl.DateTimeFormatOptions = { 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
+
+  const options: Intl.DateTimeFormatOptions = {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
   };
-  
+
   if (start.toDateString() === end.toDateString()) {
     return start.toLocaleDateString('en-US', options);
   } else {
-    const startFormatted = start.toLocaleDateString('en-US', { 
-      month: 'long', 
-      day: 'numeric' 
+    const startFormatted = start.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric'
     });
     const endFormatted = end.toLocaleDateString('en-US', options);
     return `${startFormatted}-${endFormatted.split(' ')[1]}, ${end.getFullYear()}`;

@@ -1,6 +1,7 @@
 //components\event-details.tsx
 "use client"
 import { ArrowLeft } from "lucide-react"
+import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { EventDetailsCard } from "@/components/event-details-card"
 import { AttendeesList } from "@/components/attendees-list"
@@ -17,8 +18,20 @@ type EventWithStats = Omit<Event, "attendees"> & {
   }
 }
 
-export function EventDetails({ eventId, onBack }: { eventId: string; onBack: () => void }) {
+export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: () => void }) {
   const [event, setEvent] = useState<EventWithStats | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
+
+  const handleRefresh = () => setRefreshKey(prev => prev + 1)
+  const router = useRouter()
+
+  const handleBack = () => {
+    if (onBack) {
+      onBack()
+    } else {
+      router.push("/")
+    }
+  }
 
   useEffect(() => {
     const fetchEvent = async () => {
@@ -28,7 +41,7 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack: () 
         .select("*, magic_link, schedules")
         .eq("id", parseInt(eventId))
         .single()
-  
+
       if (error) {
         console.error("Error fetching event:", error)
         return
@@ -59,8 +72,8 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack: () 
 
         // Count attended (those with non-empty attendance object)
         if (
-          attendee.attendance && 
-          typeof attendee.attendance === 'object' && 
+          attendee.attendance &&
+          typeof attendee.attendance === 'object' &&
           Object.keys(attendee.attendance).length > 0
         ) {
           stats.attended += 1
@@ -87,9 +100,9 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack: () 
         end_date: data.end_date,
       })
     }
-  
+
     fetchEvent()
-  }, [eventId])
+  }, [eventId, refreshKey])
 
   if (!event) {
     return (
@@ -104,7 +117,7 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack: () 
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={onBack} className="rounded-lg bg-transparent">
+          <Button variant="outline" size="icon" onClick={handleBack} className="rounded-lg bg-transparent">
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
@@ -117,10 +130,11 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack: () 
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EventDetailsCard event={event} />
+          <EventDetailsCard event={event} onAttendeeAdded={handleRefresh} />
           <AttendeesList
             eventId={eventId}
             scheduleDates={event.schedule.map((s) => ({ date: s.date }))}
+            refreshKey={refreshKey}
           />
         </div>
       </div>

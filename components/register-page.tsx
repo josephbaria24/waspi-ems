@@ -46,13 +46,13 @@ export default function RegisterPage() {
   const [cropArea, setCropArea] = useState<CropArea>({ x: 0, y: 0, width: 1200, height: 628 })
   const [isDragging, setIsDragging] = useState(false)
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
-  
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const cropImageRef = useRef<HTMLImageElement>(null)
-  
+
   const { toast } = useToast()
-  
+
   const [formData, setFormData] = useState({
     personal_name: "",
     middle_name: "",
@@ -74,7 +74,7 @@ export default function RegisterPage() {
       const { data: { session } } = await supabase.auth.getSession()
       setIsAdmin(!!session)
     }
-    
+
     checkAuth()
   }, [])
 
@@ -84,7 +84,7 @@ export default function RegisterPage() {
         setLoading(false)
         return
       }
-      
+
       const { data, error } = await supabase
         .from("events")
         .select("id, name, price, venue, start_date, end_date, feature_image, description")
@@ -99,7 +99,7 @@ export default function RegisterPage() {
           description: "Failed to load event details.",
         })
       }
-      
+
       setEvent(data)
       setLoading(false)
     }
@@ -112,22 +112,22 @@ export default function RegisterPage() {
       console.log('No file selected or no event')
       return
     }
-    
+
     const file = e.target.files[0]
     console.log('File selected:', file.name, file.size, file.type)
-    
+
     setOriginalFile(file)
-    
+
     const img = new Image()
     const objectUrl = URL.createObjectURL(file)
     img.src = objectUrl
-    
+
     img.onload = () => {
       console.log('Image dimensions:', img.width, 'x', img.height)
-      
+
       const targetRatio = 1200 / 628
       const imageRatio = img.width / img.height
-      
+
       let cropWidth, cropHeight
       if (imageRatio > targetRatio) {
         cropHeight = img.height
@@ -136,15 +136,15 @@ export default function RegisterPage() {
         cropWidth = img.width
         cropHeight = cropWidth / targetRatio
       }
-      
+
       const x = (img.width - cropWidth) / 2
       const y = (img.height - cropHeight) / 2
-      
+
       setCropArea({ x, y, width: cropWidth, height: cropHeight })
       setImageToCrop(objectUrl)
       setShowCropModal(true)
     }
-    
+
     img.onerror = () => {
       console.error('Failed to load image')
       toast({
@@ -154,7 +154,7 @@ export default function RegisterPage() {
       })
       URL.revokeObjectURL(objectUrl)
     }
-    
+
     e.target.value = ''
   }
 
@@ -165,21 +165,21 @@ export default function RegisterPage() {
 
   const handleCropMouseMove = useCallback((e: MouseEvent) => {
     if (!isDragging || !cropImageRef.current) return
-    
+
     const img = cropImageRef.current
     const rect = img.getBoundingClientRect()
     const scaleX = img.naturalWidth / rect.width
     const scaleY = img.naturalHeight / rect.height
-    
+
     const deltaX = (e.clientX - dragStart.x) * scaleX
     const deltaY = (e.clientY - dragStart.y) * scaleY
-    
+
     setCropArea(prev => {
       const newX = Math.max(0, Math.min(prev.x + deltaX, img.naturalWidth - prev.width))
       const newY = Math.max(0, Math.min(prev.y + deltaY, img.naturalHeight - prev.height))
       return { ...prev, x: newX, y: newY }
     })
-    
+
     setDragStart({ x: e.clientX, y: e.clientY })
   }, [isDragging, dragStart])
 
@@ -200,24 +200,24 @@ export default function RegisterPage() {
 
   const handleCropConfirm = async () => {
     if (!imageToCrop || !originalFile || !event) return
-    
+
     setUploading(true)
-    
+
     try {
       const img = new Image()
       img.src = imageToCrop
-      
+
       await new Promise((resolve) => {
         img.onload = resolve
       })
-      
+
       const canvas = document.createElement('canvas')
       canvas.width = 1200
       canvas.height = 628
       const ctx = canvas.getContext('2d')
-      
+
       if (!ctx) throw new Error('Failed to get canvas context')
-      
+
       ctx.drawImage(
         img,
         cropArea.x,
@@ -229,15 +229,15 @@ export default function RegisterPage() {
         1200,
         628
       )
-      
+
       const blob = await new Promise<Blob>((resolve) => {
         canvas.toBlob((b) => resolve(b!), 'image/jpeg', 0.95)
       })
-      
+
       const fileExt = 'jpg'
       const fileName = `${event.id}-${Date.now()}.${fileExt}`
       const filePath = `featured-image/${fileName}`
-      
+
       console.log('Upload path:', filePath)
 
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -277,7 +277,7 @@ export default function RegisterPage() {
       setEditMode(false)
       setShowCropModal(false)
       setImageToCrop(null)
-      
+
       toast({
         title: "Success",
         description: "Feature image uploaded successfully.",
@@ -308,7 +308,7 @@ export default function RegisterPage() {
 
   const handleRemoveImage = async () => {
     if (!event) return
-    
+
     try {
       const { error } = await supabase
         .from('events')
@@ -319,7 +319,7 @@ export default function RegisterPage() {
 
       setEvent({ ...event, feature_image: undefined })
       setEditMode(false)
-      
+
       toast({
         title: "Success",
         description: "Feature image removed.",
@@ -363,7 +363,7 @@ export default function RegisterPage() {
         last_name: formData.last_name.trim(),
         email: formData.email.trim(),
         mobile_number: formData.mobile_number.trim(),
-        date_of_birth: formData.date_of_birth,
+        date_of_birth: formData.date_of_birth || null,
         address: formData.address.trim(),
         company: formData.company.trim() || null,
         position: formData.position.trim() || null,
@@ -390,7 +390,7 @@ export default function RegisterPage() {
       } else {
         if (data && data.length > 0) {
           const attendee = data[0]
-          
+
           // Send confirmation email to attendee
           await fetch("/api/send-confirmation", {
             method: "POST",
@@ -427,7 +427,7 @@ export default function RegisterPage() {
             }),
           })
         }
-        
+
         setSubmitted(true)
       }
     } catch (err) {
@@ -478,7 +478,7 @@ export default function RegisterPage() {
               <div className="rounded-full bg-green-500 p-6">
                 <CheckCircle2 className="h-16 w-16 text-white" />
               </div>
-              
+
               <div className="space-y-2">
                 <h2 className="text-3xl font-bold text-foreground">Great!</h2>
                 <p className="text-muted-foreground">
@@ -556,7 +556,7 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="flex gap-2 justify-end">
                 <Button
                   variant="outline"
@@ -590,17 +590,17 @@ export default function RegisterPage() {
 
       {isAdmin && (
         <div className="w-full max-w-2xl mb-4 bg-yellow-500 border-2 text-black px-4 py-2 rounded-lg flex items-center justify-between">
-          <span className="font-semibold flex gap-2"><UserCog/> Admin Mode</span>
+          <span className="font-semibold flex gap-2"><UserCog /> Admin Mode</span>
         </div>
       )}
-      
+
       <Card className="w-full max-w-2xl">
         {(event.feature_image || (isAdmin && editMode)) && (
           <div className="relative">
             {event.feature_image ? (
               <div className="relative w-full h-[314px] overflow-hidden rounded-t-lg">
-                <img 
-                  src={event.feature_image} 
+                <img
+                  src={event.feature_image}
                   alt={event.name}
                   className="w-full h-full object-cover"
                 />
@@ -634,7 +634,7 @@ export default function RegisterPage() {
               </div>
             ) : (
               isAdmin && editMode && (
-                <div 
+                <div
                   className="w-full h-[314px] border-2 border-dashed border-gray-300 rounded-t-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors"
                   onClick={() => fileInputRef.current?.click()}
                 >
@@ -698,7 +698,7 @@ export default function RegisterPage() {
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Personal Details</h2>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="personal_name">
@@ -713,7 +713,7 @@ export default function RegisterPage() {
                     disabled={submitting}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="middle_name">Middle Name</Label>
                   <Input
@@ -724,7 +724,7 @@ export default function RegisterPage() {
                     disabled={submitting}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="last_name">
                     Last Name <span className="text-destructive">*</span>
@@ -755,7 +755,7 @@ export default function RegisterPage() {
                     disabled={submitting}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="mobile_number">
                     Mobile Number <span className="text-destructive">*</span>
@@ -770,15 +770,12 @@ export default function RegisterPage() {
                     disabled={submitting}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
-                  <Label htmlFor="date_of_birth">
-                    Date of Birth <span className="text-destructive">*</span>
-                  </Label>
+                  <Label htmlFor="date_of_birth">Date of Birth</Label>
                   <Input
                     id="date_of_birth"
                     type="date"
-                    required
                     value={formData.date_of_birth}
                     onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
                     disabled={submitting}
@@ -805,7 +802,7 @@ export default function RegisterPage() {
 
             <div className="space-y-4">
               <h2 className="text-lg font-semibold">Employment Details (Optional)</h2>
-              
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="company">Company Name</Label>
@@ -817,7 +814,7 @@ export default function RegisterPage() {
                     disabled={submitting}
                   />
                 </div>
-                
+
                 <div className="space-y-2">
                   <Label htmlFor="position">Position</Label>
                   <Input
@@ -861,9 +858,9 @@ export default function RegisterPage() {
               </div>
             </div>
 
-            <Button 
-              type="submit" 
-              className="w-full bg-green-600 hover:bg-green-700" 
+            <Button
+              type="submit"
+              className="w-full bg-green-600 hover:bg-green-700"
               size="lg"
               disabled={submitting || !dataPrivacyAgreed}
             >

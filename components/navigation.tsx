@@ -6,6 +6,8 @@ import { Calendar, Settings, LogOut, Bell, Search, QrCode } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase-client"
 
+import { useRouter } from "next/navigation"
+
 interface NavigationProps {
   currentEventId?: string | null
   onQRScanClick?: () => void
@@ -13,6 +15,7 @@ interface NavigationProps {
 
 export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
   const [active, setActive] = useState<"events" | "qr" | "settings">("events")
+  const router = useRouter()
 
   const handleComingSoon = () => {
     toast.info("🚧 This feature will be available soon!", { duration: 3000 })
@@ -28,7 +31,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
     if (onQRScanClick) {
       onQRScanClick()
     } else {
-      toast.success("📷 QR Scanner opened!")
+      router.push(`/events/${currentEventId}/qr-scan`)
     }
   }
 
@@ -63,7 +66,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
 
           {/* Center Nav */}
           <div className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-1">
-           
+
             <NavIcon
               icon={QrCode}
               label="QR Scanner"
@@ -119,11 +122,10 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
       <button
         onClick={handleQRScanner}
         disabled={!currentEventId}
-        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center rounded-full p-4 shadow-lg transition-all sm:hidden ${
-          currentEventId
+        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center rounded-full p-4 shadow-lg transition-all sm:hidden ${currentEventId
             ? "bg-primary text-primary-foreground hover:bg-primary/90"
             : "bg-muted text-muted-foreground cursor-not-allowed"
-        }`}
+          }`}
         title="Open QR Scanner"
       >
         <QrCode className="h-6 w-6" />
@@ -149,13 +151,12 @@ function NavIcon({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-        active
+      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active
           ? "bg-primary text-primary-foreground"
           : disabled
-          ? "text-muted-foreground/50 cursor-not-allowed"
-          : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-      }`}
+            ? "text-muted-foreground/50 cursor-not-allowed"
+            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+        }`}
     >
       <Icon className="h-4 w-4" />
       <span className="hidden sm:inline">{label}</span>

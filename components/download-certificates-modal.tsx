@@ -6,8 +6,31 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
-import { Search, Download, Loader2 } from "lucide-react"
+import { Search, Download, Loader2, Award, Trophy, CalendarCheck } from "lucide-react"
 import { supabase } from "@/lib/supabase-client"
+
+type TemplateType = "participation" | "awardee" | "attendance"
+
+const TEMPLATE_TYPES: { value: TemplateType; label: string; icon: any; description: string }[] = [
+  {
+    value: "participation",
+    label: "Participation",
+    icon: Award,
+    description: "For all participants"
+  },
+  {
+    value: "awardee",
+    label: "Awardee",
+    icon: Trophy,
+    description: "For special awardees"
+  },
+  {
+    value: "attendance",
+    label: "Attendance",
+    icon: CalendarCheck,
+    description: "For attendance record"
+  }
+]
 
 interface Attendee {
   id: number
@@ -34,6 +57,8 @@ export default function DownloadCertificatesModal({
 }: DownloadCertificatesModalProps) {
   const [attendees, setAttendees] = useState<Attendee[]>([])
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set())
+  const [selectedTemplate, setSelectedTemplate] = useState<TemplateType>("participation")
+  const [availableTemplates, setAvailableTemplates] = useState<Set<TemplateType>>(new Set())
   const [searchQuery, setSearchQuery] = useState("")
   const [loading, setLoading] = useState(false)
   const [downloading, setDownloading] = useState(false)
@@ -41,11 +66,36 @@ export default function DownloadCertificatesModal({
   // Fetch attendees when modal opens
   useEffect(() => {
     if (open) {
+      fetchAvailableTemplates()
       fetchAttendees()
       setSelectedIds(new Set())
       setSearchQuery("")
     }
   }, [open, eventId])
+
+  const fetchAvailableTemplates = async () => {
+    const templates = new Set<TemplateType>()
+
+    for (const type of TEMPLATE_TYPES) {
+      try {
+        const response = await fetch(`/api/certificate-template?eventId=${eventId}&templateType=${type.value}`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.template) {
+            templates.add(type.value)
+          }
+        }
+      } catch (error) {
+        console.error(`Error loading ${type.value} template:`, error)
+      }
+    }
+
+    setAvailableTemplates(templates)
+    // If multiple exist, default to participation if it exists, else the first available
+    if (templates.size > 0 && !templates.has("participation")) {
+      setSelectedTemplate(Array.from(templates)[0])
+    }
+  }
 
   const fetchAttendees = async () => {
     setLoading(true)
@@ -79,7 +129,7 @@ export default function DownloadCertificatesModal({
   }, [attendees, searchQuery])
 
   // Check if all filtered attendees are selected
-  const allSelected = filteredAttendees.length > 0 && 
+  const allSelected = filteredAttendees.length > 0 &&
     filteredAttendees.every((a) => selectedIds.has(a.id))
 
   // Toggle select all
@@ -118,7 +168,7 @@ export default function DownloadCertificatesModal({
     setDownloading(true)
     try {
       const selectedAttendees = attendees.filter((a) => selectedIds.has(a.id))
-      
+
       for (const attendee of selectedAttendees) {
         try {
           const response = await fetch("/api/generate-certificate", {
@@ -126,6 +176,7 @@ export default function DownloadCertificatesModal({
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
               referenceId: attendee.reference_id,
+              templateType: selectedTemplate,
             }),
           })
 
@@ -138,7 +189,7 @@ export default function DownloadCertificatesModal({
           const url = window.URL.createObjectURL(blob)
           const a = document.createElement("a")
           a.href = url
-          a.download = `Certificate_${attendee.personal_name}_${attendee.last_name}.pdf`
+          a.download = `Certificate_${selectedTemplate}_${attendee.personal_name}_${attendee.last_name}.pdf`
           document.body.appendChild(a)
           a.click()
           document.body.removeChild(a)
@@ -167,9 +218,36 @@ export default function DownloadCertificatesModal({
         <DialogHeader>
           <DialogTitle>Download Certificates</DialogTitle>
           <DialogDescription>
-            Select attendees to download their certificates. Only attendees who completed evaluations are shown.
+            Choose a certificate type and select attendees to download.
           </DialogDescription>
         </DialogHeader>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 mb-4">
+          {TEMPLATE_TYPES.map((type) => {
+            const Icon = type.icon
+            const isAvailable = availableTemplates.has(type.value)
+            return (
+              <button
+                key={type.value}
+                onClick={() => isAvailable && setSelectedTemplate(type.value)}
+                disabled={!isAvailable || downloading}
+                className={`p-3 rounded-lg border-2 text-left transition-all ${selectedTemplate === type.value
+                    ? "border-primary bg-primary/5"
+                    : isAvailable
+                      ? "border-border hover:border-primary/50"
+                      : "border-border opacity-50 cursor-not-allowed"
+                  }`}
+              >
+                <div className="flex items-center gap-2 mb-1">
+                  <Icon className={`h-4 w-4 ${selectedTemplate === type.value ? "text-primary" : "text-muted-foreground"}`} />
+                  <span className="text-sm font-semibold">{type.label}</span>
+                </div>
+                <p className="text-[10px] text-muted-foreground leading-tight">{type.description}</p>
+                {!isAvailable && <p className="text-[10px] text-red-500 mt-1">Not configured</p>}
+              </button>
+            )
+          })}
+        </div>
 
         <div className="space-y-4 flex-1 overflow-hidden flex flex-col">
           {/* Search */}

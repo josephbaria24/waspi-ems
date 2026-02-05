@@ -46,18 +46,18 @@ interface EmailResult {
   error?: string
 }
 
-export function AttendeesList({ eventId, scheduleDates }: { eventId: string; scheduleDates: EventScheduleDate[] }) {
+export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId: string; scheduleDates: EventScheduleDate[]; refreshKey?: number }) {
   const [searchQuery, setSearchQuery] = useState("")
   const [attendees, setAttendees] = useState<Attendee[]>([])
   const [editingAttendee, setEditingAttendee] = useState<Attendee | null>(null)
   const [editForm, setEditForm] = useState<Partial<Attendee>>({})
   const [saving, setSaving] = useState(false)
-  
+
   // Quick Actions State
   const [quickActionMode, setQuickActionMode] = useState<QuickActionMode>(null)
   const [selectedIds, setSelectedIds] = useState<number[]>([])
   const [selectedDate, setSelectedDate] = useState<string>("")
-  
+
   // Email Sending State
   const [isSendingEmails, setIsSendingEmails] = useState(false)
   const [emailProgress, setEmailProgress] = useState({ current: 0, total: 0 })
@@ -96,7 +96,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     }
 
     fetchAttendees()
-  }, [eventId])
+  }, [eventId, refreshKey])
 
   // Check if attendee is exempt from payment (Organizer or Speaker)
   const isPaymentExempt = useCallback((roles?: string[]) => {
@@ -106,13 +106,13 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
 
   const toggleAttendance = async (attendeeId: number, isoDate: string) => {
     const epochDate = new Date(isoDate).getTime()
-  
+
     const attendee = attendees.find((a) => a.id === attendeeId)
     if (!attendee) return
-  
+
     const current = attendee.attendance.find((a) => a.date === epochDate)
     let updatedAttendance = [...attendee.attendance]
-  
+
     if (!current) {
       updatedAttendance.push({ date: epochDate, status: "Present" })
     } else if (current.status === "Present") {
@@ -122,12 +122,12 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     } else if (current.status === "Absent") {
       updatedAttendance = updatedAttendance.filter((a) => a.date !== epochDate)
     }
-  
+
     await supabase
       .from("attendees")
       .update({ attendance: updatedAttendance })
       .eq("id", attendeeId)
-  
+
     setAttendees((prev) =>
       prev.map((a) =>
         a.id === attendeeId ? { ...a, attendance: updatedAttendance } : a
@@ -191,7 +191,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
 
   const handleSaveEdit = async () => {
     if (!editingAttendee) return
-    
+
     setSaving(true)
     try {
       const { error } = await supabase
@@ -215,10 +215,10 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
           prev.map((a) =>
             a.id === editingAttendee.id
               ? {
-                  ...a,
-                  ...editForm,
-                  name: `${editForm.personal_name} ${editForm.last_name}`.trim()
-                }
+                ...a,
+                ...editForm,
+                name: `${editForm.personal_name} ${editForm.last_name}`.trim()
+              }
               : a
           )
         )
@@ -262,7 +262,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
 
     for (let i = 0; i < selectedAttendees.length; i++) {
       const attendee = selectedAttendees[i]
-      
+
       if (!isValidEmail(attendee.email)) {
         results.push({
           name: attendee.name,
@@ -361,7 +361,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
   }
 
   const toggleSelectAttendee = (id: number) => {
-    setSelectedIds(prev => 
+    setSelectedIds(prev =>
       prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     )
   }
@@ -378,47 +378,47 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     }
 
     if (quickActionMode === "payment") {
-      const updates = selectedIds.map(id => 
+      const updates = selectedIds.map(id =>
         supabase
           .from("attendees")
           .update({ payment_status: "Fully Paid" })
           .eq("id", id)
       )
-      
+
       await Promise.all(updates)
-      
+
       setAttendees(prev =>
         prev.map(a =>
           selectedIds.includes(a.id) ? { ...a, payment_status: "Fully Paid" } : a
         )
       )
-      
+
       alert(`✅ Marked ${selectedIds.length} attendee(s) as Fully Paid`)
     } else if (quickActionMode === "organizer" || quickActionMode === "speaker" || quickActionMode === "attendee") {
       const roleToAdd = quickActionMode === "organizer" ? "Organizer" : quickActionMode === "speaker" ? "Speaker" : "Attendee"
-      
+
       const updates = selectedIds.map(async (id) => {
         const attendee = attendees.find(a => a.id === id)
         if (!attendee) return
-        
+
         const currentRoles = attendee.roles || []
         const updatedRoles = currentRoles.includes(roleToAdd)
           ? currentRoles
           : [...currentRoles, roleToAdd]
-        
+
         return supabase
           .from("attendees")
           .update({ roles: updatedRoles })
           .eq("id", id)
       })
-      
+
       await Promise.all(updates)
-      
+
       const { data } = await supabase
         .from("attendees")
         .select("*")
         .eq("event_id", parseInt(eventId))
-      
+
       if (data) {
         setAttendees(
           data.map((a: any) => ({
@@ -441,18 +441,18 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
           }))
         )
       }
-      
+
       alert(`✅ Marked ${selectedIds.length} attendee(s) as ${roleToAdd}`)
     } else if (quickActionMode === "attendance" && selectedDate) {
       const epochDate = new Date(selectedDate).getTime()
-      
+
       const updates = selectedIds.map(async (id) => {
         const attendee = attendees.find(a => a.id === id)
         if (!attendee) return
-        
+
         const existing = attendee.attendance.find(a => a.date === epochDate)
         let updatedAttendance = [...attendee.attendance]
-        
+
         if (!existing) {
           updatedAttendance.push({ date: epochDate, status: "Present" })
         } else {
@@ -460,20 +460,20 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
             a.date === epochDate ? { ...a, status: "Present" } : a
           )
         }
-        
+
         return supabase
           .from("attendees")
           .update({ attendance: updatedAttendance })
           .eq("id", id)
       })
-      
+
       await Promise.all(updates)
-      
+
       const { data } = await supabase
         .from("attendees")
         .select("*")
         .eq("event_id", parseInt(eventId))
-      
+
       if (data) {
         setAttendees(
           data.map((a: any) => ({
@@ -496,17 +496,17 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
           }))
         )
       }
-      
+
       alert(`✅ Marked ${selectedIds.length} attendee(s) as Present`)
     }
-    
+
     handleCancelQuickAction()
   }
-  
+
   // Optimized filtering with useMemo
   const filteredAttendees = useMemo(() => {
     if (!searchQuery.trim()) return attendees
-    
+
     const lowerQuery = searchQuery.toLowerCase()
     return attendees.filter((attendee) => {
       const name = attendee.name?.toLowerCase() || ""
@@ -525,7 +525,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
     if (isPaymentExempt(roles)) {
       return "bg-gray-200 text-gray-500 border-gray-300 opacity-50"
     }
-    
+
     switch (status) {
       case "Fully Paid":
         return "bg-green-100 text-green-700 border-green-300"
@@ -590,7 +590,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   className="pl-9 w-full"
                 />
               </div>
-              
+
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="gap-2 w-full sm:w-auto">
@@ -635,21 +635,21 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                   <div className="flex items-center gap-2 flex-1 min-w-0">
                     <Zap className="h-5 w-5 text-blue-600 flex-shrink-0" />
                     <span className="font-semibold text-blue-900 text-sm sm:text-base truncate">
-                      {quickActionMode === "payment" 
-                        ? "Quick Mark as Fully Paid" 
+                      {quickActionMode === "payment"
+                        ? "Quick Mark as Fully Paid"
                         : quickActionMode === "attendance"
-                        ? "Quick Mark as Present"
-                        : quickActionMode === "organizer"
-                        ? "Quick Mark as Organizer"
-                        : quickActionMode === "speaker"
-                        ? "Quick Mark as Speaker"
-                        : quickActionMode === "attendee"
-                        ? "Quick Mark as Attendee"
-                        : "Send Confirmation Emails"}
+                          ? "Quick Mark as Present"
+                          : quickActionMode === "organizer"
+                            ? "Quick Mark as Organizer"
+                            : quickActionMode === "speaker"
+                              ? "Quick Mark as Speaker"
+                              : quickActionMode === "attendee"
+                                ? "Quick Mark as Attendee"
+                                : "Send Confirmation Emails"}
                     </span>
                   </div>
-                  <Button 
-                    size="sm" 
+                  <Button
+                    size="sm"
                     variant="ghost"
                     onClick={handleCancelQuickAction}
                     className="h-8 w-8 p-0 flex-shrink-0"
@@ -679,17 +679,17 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                       </SelectContent>
                     </Select>
                   )}
-                  
+
                   <div className="flex items-center justify-between sm:justify-start gap-3 flex-1">
                     <span className="text-sm text-blue-700 font-medium">
                       {selectedIds.length} selected
                     </span>
-                    
-                    <Button 
-                      size="sm" 
+
+                    <Button
+                      size="sm"
                       onClick={executeQuickAction}
                       disabled={
-                        selectedIds.length === 0 || 
+                        selectedIds.length === 0 ||
                         (quickActionMode === "attendance" && !selectedDate) ||
                         isSendingEmails
                       }
@@ -717,8 +717,8 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                         {emailProgress.current} / {emailProgress.total}
                       </span>
                     </div>
-                    <Progress 
-                      value={(emailProgress.current / emailProgress.total) * 100} 
+                    <Progress
+                      value={(emailProgress.current / emailProgress.total) * 100}
                       className="h-2"
                     />
                   </div>
@@ -734,18 +734,17 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                         {skippedCount > 0 && <span className="text-orange-600">⊘ {skippedCount} skipped</span>}
                       </div>
                     </div>
-                    
+
                     <div className="max-h-60 overflow-y-auto space-y-2 bg-white rounded border p-3">
                       {emailResults.map((result, idx) => (
-                        <div 
-                          key={idx} 
-                          className={`flex items-start gap-2 text-sm p-2 rounded ${
-                            result.status === "success" 
-                              ? "bg-green-50 border-l-2 border-green-500" 
+                        <div
+                          key={idx}
+                          className={`flex items-start gap-2 text-sm p-2 rounded ${result.status === "success"
+                              ? "bg-green-50 border-l-2 border-green-500"
                               : result.status === "skipped"
-                              ? "bg-orange-50 border-l-2 border-orange-500"
-                              : "bg-red-50 border-l-2 border-red-500"
-                          }`}
+                                ? "bg-orange-50 border-l-2 border-orange-500"
+                                : "bg-red-50 border-l-2 border-red-500"
+                            }`}
                         >
                           <div className="flex-shrink-0 mt-0.5">
                             {result.status === "success" ? (
@@ -772,7 +771,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
             </div>
           )}
         </CardHeader>
-        
+
         <CardContent>
           <div className="overflow-x-auto max-h-[600px] overflow-y-auto border rounded-lg">
             <table className="min-w-full text-sm relative">
@@ -809,7 +808,7 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
               <tbody>
                 {filteredAttendees.map((attendee) => {
                   const exempt = isPaymentExempt(attendee.roles)
-                  
+
                   return (
                     <tr key={attendee.id} className="border-b hover:bg-muted/50">
                       {quickActionMode && (
@@ -840,8 +839,8 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                       <td className="px-3 py-3 text-center bg-background">
                         <DropdownMenu>
                           <DropdownMenuTrigger asChild>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               className="h-8"
                               disabled={quickActionMode !== null}
@@ -932,20 +931,19 @@ export function AttendeesList({ eventId, scheduleDates }: { eventId: string; sch
                           </Select>
                         )}
                       </td>
-                      
+
                       {scheduleDates.map((d) => (
                         <td key={d.date} className="px-3 py-3">
                           <Button
                             variant="ghost"
                             onClick={() => toggleAttendance(attendee.id, d.date)}
                             disabled={quickActionMode !== null}
-                            className={`rounded-full px-3 py-1 border text-xs cursor-pointer whitespace-nowrap ${
-                              getStatusDisplay(attendee, d.date) === "Present"
+                            className={`rounded-full px-3 py-1 border text-xs cursor-pointer whitespace-nowrap ${getStatusDisplay(attendee, d.date) === "Present"
                                 ? "bg-green-100 text-green-700 hover:bg-green-200"
                                 : getStatusDisplay(attendee, d.date) === "Absent"
-                                ? "bg-red-100 text-red-700 hover:bg-red-200"
-                                : "bg-muted text-muted-foreground hover:bg-muted/80"
-                            }`}
+                                  ? "bg-red-100 text-red-700 hover:bg-red-200"
+                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                              }`}
                           >
                             {getStatusDisplay(attendee, d.date)} <Calendar className="ml-1 h-3 w-3" />
                           </Button>
