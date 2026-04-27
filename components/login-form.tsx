@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useRouter } from "next/navigation"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase-client"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -25,6 +25,9 @@ export function LoginForm({
   ...props
 }: React.ComponentProps<"div">) {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const redirectTo = searchParams.get("redirect") || "/"
+
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [loading, setLoading] = useState(false)
@@ -39,8 +42,8 @@ export function LoginForm({
       } = await supabase.auth.getSession()
 
       if (session) {
-        // Already logged in → redirect to home
-        router.replace("/")
+        // Already logged in → redirect to destination
+        router.replace(redirectTo)
       } else {
         setCheckingSession(false)
       }
@@ -67,7 +70,7 @@ export function LoginForm({
     }
 
     if (data?.user) {
-      router.push("/") // redirect after login
+      router.push(redirectTo) // redirect after login
     }
   }
 

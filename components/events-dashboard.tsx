@@ -47,7 +47,7 @@ async function fetchAllAttendees(eventId?: number) {
 
     if (data && data.length > 0) {
       allAttendees = [...allAttendees, ...data]
-      
+
       if (data.length < PAGE_SIZE) {
         hasMore = false
       } else {
@@ -69,7 +69,7 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
   useEffect(() => {
     const fetchEvents = async () => {
       setIsLoading(true)
-      
+
       // Get all events
       const { data: eventsData, error } = await supabase.from("events").select("*")
       if (error) {
@@ -97,30 +97,30 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
       attendeesData.forEach((attendee) => {
         const eventId = Number(attendee.event_id)
         if (!eventId || isNaN(eventId)) return
-      
+
         const stats = attendeeStatsMap.get(eventId) ?? {
           registered: 0,
           attended: 0,
           paid: 0,
         }
-      
+
         // Registered: Count ALL attendees
         stats.registered += 1
-      
+
         // Attended: Count attendees with non-empty attendance object
         if (
-          attendee.attendance && 
-          typeof attendee.attendance === 'object' && 
+          attendee.attendance &&
+          typeof attendee.attendance === 'object' &&
           Object.keys(attendee.attendance).length > 0
         ) {
           stats.attended += 1
         }
-      
+
         // Paid: Count attendees with "Fully Paid" status
         if (attendee.payment_status === "Fully Paid") {
           stats.paid += 1
         }
-      
+
         attendeeStatsMap.set(eventId, stats)
       })
 
@@ -197,8 +197,8 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
   )
 
   // Calculate attendance rate (avoid division by zero)
-  const attendanceRate = totalStats.registered > 0 
-    ? Math.round((totalStats.attended / totalStats.registered) * 100) 
+  const attendanceRate = totalStats.registered > 0
+    ? Math.round((totalStats.attended / totalStats.registered) * 100)
     : 0
 
   if (isLoading) {
@@ -223,15 +223,26 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Events</h1>
             <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">Manage your events and attendees</p>
           </div>
-          <Button
-            onClick={() => setIsModalOpen(true)}
-            className="bg-primary text-primary-foreground hover:bg-accent"
-            size="sm"
-          >
-            <Plus className="mr-1 h-4 w-4" />
-            <span className="hidden sm:inline">Create Event</span>
-            <span className="sm:hidden">Create</span>
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button
+              onClick={() => window.location.href = "/membership/admin"}
+              variant="outline"
+              size="sm"
+              className="border-primary/30"
+            >
+              <Users className="mr-1 h-4 w-4" />
+              <span className="hidden sm:inline">Members</span>
+            </Button>
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="bg-primary text-primary-foreground hover:bg-accent"
+              size="sm"
+            >
+              <Plus className="mr-1 h-4 w-4" />
+              <span className="hidden sm:inline">Create Event</span>
+              <span className="sm:hidden">Create</span>
+            </Button>
+          </div>
         </div>
 
         {/* Stats Overview Cards */}
@@ -291,7 +302,7 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
                     <p className="text-xs font-medium text-muted-foreground">Fully Paid</p>
                     <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">{totalStats.paid}</p>
                     <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      {totalStats.registered > 0 
+                      {totalStats.registered > 0
                         ? Math.round((totalStats.paid / totalStats.registered) * 100)
                         : 0}% payment rate
                     </p>

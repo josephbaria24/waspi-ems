@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import type React from "react"
-import { Calendar, Settings, LogOut, Bell, Search, QrCode } from "lucide-react"
+import { Calendar, Settings, LogOut, Bell, Search, QrCode, Users } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase-client"
 
@@ -14,7 +14,7 @@ interface NavigationProps {
 }
 
 export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
-  const [active, setActive] = useState<"events" | "qr" | "settings">("events")
+  const [active, setActive] = useState<"events" | "qr" | "settings" | "membership">("events")
   const router = useRouter()
 
   const handleComingSoon = () => {
@@ -73,6 +73,15 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
               onClick={handleQRScanner}
               disabled={!currentEventId}
               active={active === "qr"}
+            />
+            <NavIcon
+              icon={Users}
+              label="Membership"
+              onClick={() => {
+                setActive("membership")
+                router.push("/membership/admin")
+              }}
+              active={active === "membership"}
             />
             <NavIcon
               icon={Settings}

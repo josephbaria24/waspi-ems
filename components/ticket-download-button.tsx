@@ -19,6 +19,16 @@ export default function TicketDownloadButton({ referenceId }: TicketDownloadButt
         backgroundColor: null,
         scale: 3,
         logging: false,
+        onclone: (clonedDoc) => {
+          // 🛡️ Fix: html2canvas "lab" color error
+          const styleTags = clonedDoc.getElementsByTagName('style');
+          for (let i = 0; i < styleTags.length; i++) {
+            const tag = styleTags[i];
+            if (tag.innerHTML.includes('lab(') || tag.innerHTML.includes('color-mix')) {
+              tag.innerHTML = tag.innerHTML.replace(/@supports\s*\(color:\s*color-mix\s*\([^)]+\)\)\s*\{[^{}]*\{[^{}]*\}[^{}]*\}|@supports\s*\(color:\s*color-mix\s*\([^)]+\)\)\s*\{[^{}]*\}/g, '');
+            }
+          }
+        }
       })
 
       const link = document.createElement("a")
