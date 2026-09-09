@@ -1,53 +1,42 @@
 'use client'
 
-import { useState } from 'react'
-import { Header } from '@/components/layout/header'
+import Link from 'next/link'
+import { ArrowLeft } from 'lucide-react'
 import { RegistrationForm } from '@/components/forms/registration-form'
 
+const typeStyle = { fontFamily: 'Aeonik, Geist, -apple-system, BlinkMacSystemFont, sans-serif' }
+
 export default function RegisterPage() {
-  const [registrationComplete, setRegistrationComplete] = useState(false)
-
-  if (registrationComplete) {
-    return (
-      <>
-        <Header title="WASPI Registration" />
-        <div className="min-h-screen bg-background px-4 py-12">
-          <div className="max-w-2xl mx-auto">
-            <div className="bg-card border-2 border-primary/20 rounded-lg p-8 text-center space-y-6 shadow-lg">
-              <div className="flex justify-center">
-                <div className="h-20 w-20 rounded-full bg-gradient-to-br from-primary to-accent flex items-center justify-center">
-                  <span className="text-4xl">✓</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <h2 className="text-3xl font-bold text-foreground">Registration Successful!</h2>
-                <p className="text-foreground/70">
-                  Your membership application has been submitted. You will receive a confirmation email shortly.
-                </p>
-              </div>
-              <div className="bg-muted/50 border border-primary/20 rounded-lg p-4 text-sm text-foreground/80 text-left">
-                <p className="font-semibold text-primary mb-2">Next Steps:</p>
-                <ul className="space-y-1 list-disc list-inside">
-                  <li>Check your email for confirmation</li>
-                  <li>Your membership card will be prepared</li>
-                  <li>Log in to your dashboard to track status</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        </div>
-      </>
-    )
-  }
-
   return (
-    <>
-      <Header title="WASPI Registration" />
-      <div className="min-h-screen bg-background px-4 py-12">
-        <div className="max-w-5xl mx-auto">
-          <RegistrationForm onSuccess={() => setRegistrationComplete(true)} />
+    <main className="dot-grid-bg min-h-screen bg-white" style={typeStyle}>
+      <div className="mx-auto w-[min(96vw,1180px)] px-4 py-6 sm:px-6 sm:py-10">
+        <Link
+          href="/"
+          className="inline-flex w-fit items-center gap-2 rounded-full border border-[#E8EAEB] bg-white px-4 py-2 text-sm font-medium text-[#1E1E1E] shadow-sm transition-colors hover:bg-[#F2F4F4]"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back
+        </Link>
+
+        <div className="mb-6 mt-8 text-center">
+          <img
+            src="/logo.png"
+            alt="WASPI logo"
+            className="mx-auto mb-4 h-12 w-12 rounded-xl object-contain"
+          />
+          <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#00D47E]">
+            Membership
+          </p>
+          <h1 className="mt-2 text-3xl font-semibold tracking-tight text-[#1E1E1E] sm:text-4xl">
+            Join WASPI
+          </h1>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-[#8D959D]">
+            Complete the steps below to register. Fields stay compact so the form is easier to scan.
+          </p>
         </div>
+
+        <RegistrationForm />
       </div>
-    </>
+    </main>
   )
 }

@@ -4,11 +4,13 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
     CheckCircle2, XCircle, Clock, FileImage,
-    Loader2, ArrowLeft, Eye, Search, Users
+    Loader2, ArrowLeft, Eye, Search, Users, Settings2
 } from "lucide-react";
+import { MembershipSetup } from "@/components/membership-setup";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase-client";
 import { toast } from "sonner";
 
@@ -19,10 +21,27 @@ type MemberItem = {
     status: string;
     paymentStatus: string;
     receiptUrl: string | null;
+    receipts?: { url: string; uploadedAt: string | null }[];
     receiptUploadedAt: string | null;
     reviewedAt: string | null;
     expiryDate: string;
     createdAt: string;
+    paymentMethod?: string;
+    paymentDetails?: {
+        membership_amount?: number;
+        wants_physical_id?: boolean;
+        physical_id_fee?: number;
+        shipping_fee?: number;
+        amount_due?: number;
+        decline_reason?: string | null;
+        delivery?: {
+            recipient?: string;
+            address?: string;
+            city?: string;
+            province?: string;
+            zip?: string;
+        } | null;
+    } | null;
     profile: {
         fullName: string;
         email: string;
@@ -41,6 +60,9 @@ export default function MembershipAdminPage() {
     const [selectedMember, setSelectedMember] = useState<MemberItem | null>(null);
     const [searchQuery, setSearchQuery] = useState("");
     const [filter, setFilter] = useState<"all" | "Pending" | "Active" | "Declined">("all");
+    const [showSetup, setShowSetup] = useState(false);
+    const [declineReason, setDeclineReason] = useState("");
+    const [showDeclineForm, setShowDeclineForm] = useState(false);
 
     const fetchMembers = async () => {
         setIsLoading(true);
@@ -70,13 +92,19 @@ export default function MembershipAdminPage() {
         checkAuth();
     }, [router]);
 
-    const handleReview = async (memberId: string, action: "approve" | "decline") => {
+    const handleReview = async (memberId: string, action: "approve" | "decline", reason?: string) => {
+        if (action === "decline" && !reason?.trim()) {
+            setShowDeclineForm(true);
+            toast.error("Add a reason", { description: "The member will see this reason and can upload a new receipt." });
+            return;
+        }
+
         setReviewingId(memberId);
         try {
             const response = await fetch("/api/membership/review", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ memberId, action }),
+                body: JSON.stringify({ memberId, action, reason }),
             });
 
             const data = await response.json();
@@ -93,6 +121,10 @@ export default function MembershipAdminPage() {
                             status: action === "approve" ? "Active" : "Declined",
                             paymentStatus: action === "approve" ? "Paid" : "Declined",
                             reviewedAt: new Date().toISOString(),
+                            paymentDetails: {
+                                ...m.paymentDetails,
+                                decline_reason: action === "decline" ? reason : null,
+                            },
                         };
                     }
                     return m;
@@ -106,8 +138,14 @@ export default function MembershipAdminPage() {
                     status: action === "approve" ? "Active" : "Declined",
                     paymentStatus: action === "approve" ? "Paid" : "Declined",
                     reviewedAt: new Date().toISOString(),
+                    paymentDetails: {
+                        ...prev.paymentDetails,
+                        decline_reason: action === "decline" ? reason : null,
+                    },
                 } : null);
             }
+            setShowDeclineForm(false);
+            setDeclineReason("");
         } catch (error: any) {
             toast.error("Review failed", { description: error.message });
         } finally {
@@ -210,11 +248,43 @@ export default function MembershipAdminPage() {
                                         <span className="text-muted-foreground">Registered</span>
                                         <span className="font-medium">{new Date(selectedMember.createdAt).toLocaleDateString()}</span>
                                     </div>
+                                    {selectedMember.paymentDetails?.amount_due != null && (
+                                        <div className="flex justify-between">
+                                            <span className="text-muted-foreground">Amount due</span>
+                                            <span className="font-medium">₱{Number(selectedMember.paymentDetails.amount_due).toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                    {selectedMember.paymentDetails?.wants_physical_id && (
+                                        <div className="flex justify-between gap-4">
+                                            <span className="text-muted-foreground">Delivery</span>
+                                            <span className="font-medium text-right">
+                                                {[
+                                                    selectedMember.paymentDetails.delivery?.recipient,
+                                                    selectedMember.paymentDetails.delivery?.address,
+                                                    selectedMember.paymentDetails.delivery?.city,
+                                                    selectedMember.paymentDetails.delivery?.province,
+                                                    selectedMember.paymentDetails.delivery?.zip,
+                                                ].filter(Boolean).join(", ") || "Physical ID requested"}
+                                            </span>
+                                        </div>
+                                    )}
                                 </div>
 
                                 {/* Action Buttons */}
                                 {selectedMember.status === "Pending" && selectedMember.receiptUrl && (
-                                    <div className="flex gap-2 pt-4 border-t">
+                                    <div className="space-y-3 pt-4 border-t">
+                                        {showDeclineForm && (
+                                            <div className="space-y-2">
+                                                <p className="text-xs font-medium text-red-600">Reason for declining</p>
+                                                <Textarea
+                                                    value={declineReason}
+                                                    onChange={(e) => setDeclineReason(e.target.value)}
+                                                    placeholder="Explain what the member should fix before uploading again."
+                                                    rows={3}
+                                                />
+                                            </div>
+                                        )}
+                                        <div className="flex gap-2">
                                         <Button
                                             onClick={() => handleReview(selectedMember.id, "approve")}
                                             disabled={reviewingId === selectedMember.id}
@@ -227,7 +297,7 @@ export default function MembershipAdminPage() {
                                             )}
                                         </Button>
                                         <Button
-                                            onClick={() => handleReview(selectedMember.id, "decline")}
+                                            onClick={() => handleReview(selectedMember.id, "decline", declineReason)}
                                             disabled={reviewingId === selectedMember.id}
                                             variant="outline"
                                             className="flex-1 border-red-500/30 text-red-600 hover:bg-red-500/10"
@@ -235,9 +305,10 @@ export default function MembershipAdminPage() {
                                             {reviewingId === selectedMember.id ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
                                             ) : (
-                                                <><XCircle className="h-4 w-4 mr-1" />Decline</>
+                                                <><XCircle className="h-4 w-4 mr-1" />{showDeclineForm ? "Send decline" : "Decline"}</>
                                             )}
                                         </Button>
+                                        </div>
                                     </div>
                                 )}
                             </CardContent>
@@ -248,34 +319,37 @@ export default function MembershipAdminPage() {
                             <CardHeader>
                                 <CardTitle className="text-lg flex items-center gap-2">
                                     <FileImage className="h-5 w-5 text-primary" />
-                                    Receipt
+                                    Receipts
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
-                                {selectedMember.receiptUrl ? (
-                                    <div className="space-y-3">
-                                        <div className="border rounded-lg overflow-hidden">
-                                            {/* eslint-disable-next-line @next/next/no-img-element */}
-                                            <img
-                                                src={selectedMember.receiptUrl}
-                                                alt="Payment Receipt"
-                                                className="w-full max-h-[500px] object-contain bg-muted/30"
-                                            />
-                                        </div>
-                                        <a
-                                            href={selectedMember.receiptUrl}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
-                                        >
-                                            <Eye className="h-3.5 w-3.5" />
-                                            View Full Image
-                                        </a>
-                                        {selectedMember.receiptUploadedAt && (
-                                            <p className="text-xs text-muted-foreground">
-                                                Uploaded: {new Date(selectedMember.receiptUploadedAt).toLocaleString()}
-                                            </p>
-                                        )}
+                                {(selectedMember.receipts?.length || selectedMember.receiptUrl) ? (
+                                    <div className="space-y-4">
+                                        {(selectedMember.receipts?.length
+                                            ? selectedMember.receipts
+                                            : [{ url: selectedMember.receiptUrl!, uploadedAt: selectedMember.receiptUploadedAt }]
+                                        ).map((receipt, index) => (
+                                            <div key={`${receipt.url}-${index}`} className="space-y-2">
+                                                <p className="text-xs font-medium text-muted-foreground">Receipt {index + 1}</p>
+                                                <div className="border rounded-lg overflow-hidden">
+                                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                    <img
+                                                        src={receipt.url}
+                                                        alt={`Payment Receipt ${index + 1}`}
+                                                        className="w-full max-h-[420px] object-contain bg-muted/30"
+                                                    />
+                                                </div>
+                                                <a
+                                                    href={receipt.url}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="inline-flex items-center gap-1 text-sm text-primary hover:underline"
+                                                >
+                                                    <Eye className="h-3.5 w-3.5" />
+                                                    View full file
+                                                </a>
+                                            </div>
+                                        ))}
                                     </div>
                                 ) : (
                                     <div className="border-2 border-dashed border-muted-foreground/20 rounded-lg p-8 text-center">
@@ -295,6 +369,10 @@ export default function MembershipAdminPage() {
     return (
         <main className="min-h-screen bg-background">
             <div className="container mx-auto p-6 max-w-6xl space-y-6">
+                {showSetup ? (
+                    <MembershipSetup onBack={() => setShowSetup(false)} />
+                ) : (
+                <>
                 {/* Header */}
                 <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                     <div>
@@ -306,15 +384,25 @@ export default function MembershipAdminPage() {
                             Review and manage membership registrations
                         </p>
                     </div>
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => window.location.href = "/"}
-                        className="gap-1"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to Dashboard
-                    </Button>
+                    <div className="flex gap-2">
+                        <Button
+                            size="sm"
+                            onClick={() => setShowSetup(true)}
+                            className="gap-1"
+                        >
+                            <Settings2 className="h-4 w-4" />
+                            Setup
+                        </Button>
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => window.location.href = "/events"}
+                            className="gap-1"
+                        >
+                            <ArrowLeft className="h-4 w-4" />
+                            Back to Dashboard
+                        </Button>
+                    </div>
                 </div>
 
                 {/* Stats */}
@@ -396,8 +484,10 @@ export default function MembershipAdminPage() {
                                             <td className="p-3 capitalize hidden sm:table-cell">{member.membershipType}</td>
                                             <td className="p-3">{getStatusBadge(member.status)}</td>
                                             <td className="p-3">
-                                                {member.receiptUrl ? (
-                                                    <span className="text-green-600 text-xs font-medium">✓ Uploaded</span>
+                                                {(member.receipts?.length || member.receiptUrl) ? (
+                                                    <span className="text-green-600 text-xs font-medium">
+                                                        ✓ {member.receipts?.length || 1} uploaded
+                                                    </span>
                                                 ) : (
                                                     <span className="text-muted-foreground text-xs">None</span>
                                                 )}
@@ -426,7 +516,10 @@ export default function MembershipAdminPage() {
                                                             <Button
                                                                 variant="outline"
                                                                 size="sm"
-                                                                onClick={() => handleReview(member.id, "decline")}
+                                                                onClick={() => {
+                                                                    setSelectedMember(member);
+                                                                    setShowDeclineForm(true);
+                                                                }}
                                                                 disabled={reviewingId === member.id}
                                                                 className="h-7 px-2 text-xs border-red-500/30 text-red-600"
                                                             >
@@ -442,6 +535,8 @@ export default function MembershipAdminPage() {
                             </table>
                         </div>
                     </Card>
+                )}
+                </>
                 )}
             </div>
         </main>

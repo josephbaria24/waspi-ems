@@ -5,13 +5,16 @@ import { uploadToFTP } from "@/lib/ftp-upload";
 export async function POST(req: NextRequest) {
     try {
         const formData = await req.formData();
-        const file = (formData.get("file") || formData.get("receipt")) as File | null;
+        const files = [
+            ...formData.getAll("file"),
+            ...formData.getAll("receipt"),
+        ].filter((item): item is File => item instanceof File && item.size > 0);
         const trackingNumber = formData.get("trackingNumber") as string | null;
         const memberId = formData.get("memberId") as string | null;
 
-        if (!file) {
+        if (files.length === 0) {
             return NextResponse.json(
-                { error: "Receipt file is required" },
+                { error: "At least one receipt file is required" },
                 { status: 400 }
             );
         }
@@ -23,21 +26,20 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Validate file type
         const allowedTypes = ["image/jpeg", "image/png", "image/webp", "application/pdf"];
-        if (!allowedTypes.includes(file.type)) {
-            return NextResponse.json(
-                { error: "Invalid file type. Please upload a JPG, PNG, WebP, or PDF file." },
-                { status: 400 }
-            );
-        }
-
-        // Validate file size (max 10MB)
-        if (file.size > 10 * 1024 * 1024) {
-            return NextResponse.json(
-                { error: "File too large. Maximum size is 10MB." },
-                { status: 400 }
-            );
+        for (const file of files) {
+            if (!allowedTypes.includes(file.type)) {
+                return NextResponse.json(
+                    { error: "Invalid file type. Please upload JPG, PNG, WebP, or PDF files." },
+                    { status: 400 }
+                );
+            }
+            if (file.size > 10 * 1024 * 1024) {
+                return NextResponse.json(
+                    { error: "Each file must be 10MB or smaller." },
+                    { status: 400 }
+                );
+            }
         }
 
         // Look up member by tracking number or memberId
@@ -60,27 +62,47 @@ export async function POST(req: NextRequest) {
             );
         }
 
-        // Create a unique filename
-        const ext = file.name.split(".").pop() || "jpg";
-        const timestamp = Date.now();
-        const identifier = trackingNumber?.trim() || memberId;
-        const fileName = `receipt_${identifier}_${timestamp}.${ext}`;
+        const uploadedAt = new Date().toISOString();
+        const receipts: { url: string; uploadedAt: string }[] = [];
+        const identifier = trackingNumber?.trim() || member.id;
 
-        // Convert File to Buffer
-        const arrayBuffer = await file.arrayBuffer();
-        const buffer = Buffer.from(arrayBuffer);
+        for (const [index, file] of files.entries()) {
+            const ext = file.name.split(".").pop() || "jpg";
+            const fileName = `receipt_${identifier}_${Date.now()}_${index}.${ext}`;
+            const buffer = Buffer.from(await file.arrayBuffer());
+            const publicUrl = await uploadToFTP(buffer, fileName, "receipts");
 
-        // Upload to FTP
-        const publicUrl = await uploadToFTP(buffer, fileName, "receipts");
+            const { error: documentError } = await supabaseServer.from("member_documents").insert({
+                member_id: member.id,
+                document_type: "receipt",
+                file_url: publicUrl,
+            });
+            if (documentError) throw documentError;
 
-        // Update member record in Supabase
+            receipts.push({ url: publicUrl, uploadedAt });
+        }
+
+        const latestUrl = receipts[receipts.length - 1]?.url;
+        const { data: currentMember } = await supabaseServer
+            .from("members")
+            .select("payment_details, status")
+            .eq("id", member.id)
+            .single();
+
+        const paymentDetails = { ...(currentMember?.payment_details || {}) };
+        if (currentMember?.status === "Declined" || paymentDetails.decline_reason) {
+            paymentDetails.decline_reason = null;
+        }
+
         const { error: updateError } = await supabaseServer
             .from("members")
             .update({
-                receipt_url: publicUrl,
-                receipt_uploaded_at: new Date().toISOString(),
+                receipt_url: latestUrl,
+                receipt_uploaded_at: uploadedAt,
                 payment_status: "Under Review",
-                updated_at: new Date().toISOString(),
+                status: "Pending",
+                payment_details: paymentDetails,
+                updated_at: uploadedAt,
             })
             .eq("id", member.id);
 
@@ -88,8 +110,9 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json({
             success: true,
-            message: "Receipt uploaded successfully",
-            receiptUrl: publicUrl,
+            message: receipts.length > 1 ? "Receipts uploaded successfully" : "Receipt uploaded successfully",
+            receiptUrl: latestUrl,
+            receipts,
         });
     } catch (error: any) {
         console.error("Receipt upload error:", error);

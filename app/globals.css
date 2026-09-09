@@ -6,6 +6,9 @@
 :root {
   /* White and Green Theme */
   --background: #fcfcfc;
+  --dot-color: rgba(15, 23, 42, 0.12);
+  --dot-size: 0.8px;
+  --dot-gap: 16px;
   --foreground: #333333;
   --card: #ffffff;
   --card-foreground: #333333;
@@ -42,6 +45,7 @@
 
 .dark {
   --background: #1a1a1a;
+  --dot-color: rgba(255, 255, 255, 0.15);
   --foreground: #fafafa;
   --card: #262626;
   --card-foreground: #fafafa;
@@ -117,11 +121,23 @@
 }
 
 @layer base {
+  html {
+    scroll-behavior: smooth;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html {
+      scroll-behavior: auto;
+    }
+  }
+
   * {
     @apply border-border outline-ring;
   }
   body {
     @apply bg-background text-foreground;
+    background-image: radial-gradient(circle, var(--dot-color) var(--dot-size), transparent var(--dot-size));
+    background-size: var(--dot-gap) var(--dot-gap);
   }
 }
 
@@ -132,4 +148,33 @@ a.button,
 input[type="button"],
 input[type="submit"] {
   cursor: pointer;
+}
+
+.waspi-grain-char {
+  color: transparent;
+  background-color: #000000;
+  background-image:
+    radial-gradient(circle at 18% 22%, rgba(255, 255, 255, 0.06) 0.45px, transparent 0.75px),
+    radial-gradient(circle at 64% 38%, rgba(255, 255, 255, 0.035) 0.45px, transparent 0.75px),
+    radial-gradient(circle at 78% 75%, rgba(0, 0, 0, 0.28) 0.4px, transparent 0.7px),
+    linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+  background-size: 10px 10px, 12px 12px, 8px 8px, 100% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.nav-glass-frost {
+  background: rgba(255, 255, 255, 0.94) !important;
+  backdrop-filter: blur(24px) saturate(180%) !important;
+  -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
+  border: 1px solid rgba(255, 255, 255, 0.72) !important;
+  box-shadow:
+    0 8px 32px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.85) !important;
+}
+
+.dot-grid-bg {
+  background-image: radial-gradient(circle, var(--dot-color) var(--dot-size), transparent var(--dot-size));
+  background-size: var(--dot-gap) var(--dot-gap);
 }

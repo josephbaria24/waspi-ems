@@ -19,6 +19,7 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
+import { Eye, EyeOff } from "lucide-react"
 
 export function LoginForm({
   className,
@@ -26,10 +27,11 @@ export function LoginForm({
 }: React.ComponentProps<"div">) {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get("redirect") || "/"
+  const redirectTo = searchParams.get("redirect") || "/events"
 
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [checkingSession, setCheckingSession] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,8 +43,7 @@ export function LoginForm({
         data: { session },
       } = await supabase.auth.getSession()
 
-      if (session) {
-        // Already logged in → redirect to destination
+      if (session && redirectTo && redirectTo !== "/login") {
         router.replace(redirectTo)
       } else {
         setCheckingSession(false)
@@ -50,7 +51,7 @@ export function LoginForm({
     }
 
     checkSession()
-  }, [router])
+  }, [router, redirectTo])
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -70,7 +71,7 @@ export function LoginForm({
     }
 
     if (data?.user) {
-      router.push(redirectTo) // redirect after login
+      router.push(redirectTo || "/events")
     }
   }
 
@@ -132,14 +133,24 @@ export function LoginForm({
                       Forgot password?
                     </a>
                   </div>
-                  <Input
-                    id="password"
-                    type="password"
-                    required
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="rounded-lg border-gray-300 focus:ring-2 focus:ring-blue-500"
-                  />
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      required
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="rounded-lg border-gray-300 pr-10 focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((prev) => !prev)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-700"
+                      aria-label={showPassword ? "Hide password" : "Show password"}
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
                 </Field>
 
                 {error && (

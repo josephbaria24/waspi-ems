@@ -1,211 +1,407 @@
-"use client"
+import Image from 'next/image'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { LandingSection } from '@/components/landing-section'
+import MagicBento, { type BentoCardProps } from '@/components/MagicBento'
+import GradualBlur from '@/components/GradualBlur'
+import ScrollVelocity from '@/components/ScrollVelocity'
+import ScrollFloat from '@/components/ScrollFloat'
+import MergedShape from '@/components/MergedShape'
+import BorderGlow from '@/components/BorderGlow'
+import StickyCardNav from '@/components/StickyCardNav'
 
-import { useEffect, useState } from "react"
-import { useRouter } from "next/navigation"
-import Link from "next/link"
-import Image from "next/image"
-import { Button } from "@/components/ui/button"
-import { supabase } from "@/lib/supabase-client"
-import { Navigation } from "@/components/navigation"
-import { EventsDashboard } from "@/components/events-dashboard"
-import { Loader2 } from "lucide-react"
+const MARQUEE_LINE_1 = (
+  <span className="inline-flex flex-wrap items-baseline gap-x-0.5">
+    <span className="text-[#1E1E1E]">Workplace Advocates on Safety · </span>
+    <span className="text-[#00D47E]">Safe work & safe workplaces</span>
+    <span className="text-[#1E1E1E]"> · Member network · Prevention culture ·</span>
+  </span>
+)
+
+const MARQUEE_LINE_2 = (
+  <span className="inline-flex flex-wrap items-baseline gap-x-0.5">
+    <span className="text-[#1E1E1E]">Protecting Filipino workers · </span>
+    <span className="text-[#00D47E]">OSH advocacy nationwide</span>
+    <span className="text-[#1E1E1E]"> · Unified safety action · Join WASPI ·</span>
+  </span>
+)
+
+const MEMBERSHIP_BENTO_CARDS: BentoCardProps[] = [
+  {
+    color: '#ffffff',
+    title: 'Verified digital ID',
+    description: 'Official WASPI membership identity for events and coordination.',
+    label: 'Identity',
+    image: '/card6.png',
+  },
+  {
+    color: '#ffffff',
+    title: 'Learning access',
+    description: 'Webinars, talks, and practical workplace safety sessions.',
+    label: 'Learning',
+    image: '/card5.png',
+  },
+  {
+    color: '#ffffff',
+    title: 'Policy updates',
+    description: 'Curated safety regulation and compliance updates.',
+    label: 'Compliance',
+    image: '/card4.png',
+  },
+  {
+    color: '#ffffff',
+    title: 'Industry network',
+    description: 'Connect with advocates and organizations across sectors.',
+    label: 'Network',
+    image: '/card2.png',
+  },
+  {
+    color: '#ffffff',
+    title: 'Event invitations',
+    description: 'Priority access to WASPI conferences and chapter meetings.',
+    label: 'Events',
+    image: '/card3.png',
+  },
+  {
+    color: '#ffffff',
+    title: 'Resource kits',
+    description: 'Templates and guides to improve safety programs at work.',
+    label: 'Resources',
+    image: '/card1.png',
+  },
+]
+
+const palette = {
+  green: '#00D47E',
+  dark: '#1E1E1E',
+  gray: '#8D959D',
+  light: '#F2F4F4',
+}
+
+const typeStyle = { fontFamily: 'Aeonik, Geist, -apple-system, BlinkMacSystemFont, sans-serif' }
 
 export default function Home() {
-  const [loading, setLoading] = useState(true)
-  const [session, setSession] = useState<any>(null)
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const router = useRouter()
-
-  useEffect(() => {
-    const checkUser = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession()
-      setSession(session)
-      setLoading(false)
-    }
-
-    checkUser()
-
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session)
-    })
-
-    return () => {
-      subscription.unsubscribe()
-    }
-  }, [])
-
-  const handleSelectEvent = (id: string) => {
-    router.push(`/events/${id}`)
-  }
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-      </div>
-    )
-  }
-
-  // If logged in to EMS, show the dashboard
-  if (session) {
-    return (
-      <div className="min-h-screen bg-background">
-        <Navigation />
-        <EventsDashboard onSelectEvent={handleSelectEvent} />
-      </div>
-    )
-  }
-
-  // Otherwise, show the beautiful Landing Page
   return (
-    <div className="min-h-screen bg-white text-gray-900 font-sans overflow-x-hidden">
-      {/* ───────── NAVIGATION ───────── */}
-      <nav className="sticky top-0 z-50 bg-white/80 backdrop-blur-md border-b border-gray-100">
-        <div className="max-w-7xl mx-auto px-6 lg:px-8 flex items-center justify-between h-16">
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg overflow-hidden shadow-sm border border-gray-100 bg-white">
-              <Image 
-                src="/logo.png" 
-                alt="WASPI Logo" 
-                width={40} 
-                height={40} 
-                className="object-contain" 
-                onError={(e) => {
-                  e.currentTarget.style.display = 'none';
-                }}
-              />
-            </div>
-            <span className="text-xl font-bold tracking-tight text-emerald-700">
-              WASPI
-            </span>
-          </Link>
+    <main className="dot-grid-bg min-h-screen w-[90vw] bg-white p-0 mx-auto" style={typeStyle}>
+      <StickyCardNav />
+      <div className="dot-grid-bg mx-auto w-full max-w-none overflow-hidden bg-white shadow-none">
 
-          {/* Desktop Links */}
-          <div className="hidden md:flex items-center gap-8">
-            <a href="#about" className="text-sm font-medium text-gray-600 hover:text-emerald-600 transition-colors">About</a>
-            <Link href="/login">
-              <Button variant="ghost" className="text-sm font-medium text-gray-600 hover:text-emerald-600 cursor-pointer">
-                EMS Login
-              </Button>
-            </Link>
-            <Link href="/register">
-              <Button className="bg-emerald-600 hover:bg-emerald-700 text-white rounded-full px-6 text-sm font-semibold shadow-md shadow-emerald-200 cursor-pointer transition-all hover:shadow-lg hover:shadow-emerald-300">
-                Register
-              </Button>
-            </Link>
-          </div>
-
-          {/* Mobile Menu Toggle */}
-          <button
-            className="md:hidden p-2 rounded-lg hover:bg-gray-100 transition-colors"
-            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            aria-label="Toggle menu"
+        <section className="relative min-h-[560px] px-5 pt-22 pb-12 sm:px-10 sm:pt-24 sm:pb-16 lg:px-14">
+          <BorderGlow
+            className="rounded-[32px] shadow-[0_6px_18px_rgba(0,0,0,0.14)]"
+            glowColor="145 70 58"
+            borderRadius={32}
+            backgroundColor="transparent"
+            fillOpacity={0.25}
+            colors={['#22c55e', '#14b8a6', '#38bdf8']}
           >
-            <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              {mobileMenuOpen ? (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              ) : (
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              )}
-            </svg>
-          </button>
-        </div>
-
-        {/* Mobile Menu */}
-        {mobileMenuOpen && (
-          <div className="md:hidden bg-white border-t border-gray-100 px-6 py-4 space-y-3">
-            <a href="#about" className="block text-sm font-medium text-gray-600 hover:text-emerald-600 py-2">About</a>
-            <Link href="/login" className="block text-sm font-medium text-gray-600 hover:text-emerald-600 py-2">EMS Login</Link>
-            <Link href="/register">
-              <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white rounded-full text-sm font-semibold shadow-md">
-                Become a Member
-              </Button>
-            </Link>
-          </div>
-        )}
-      </nav>
-
-      {/* ───────── HERO SECTION ───────── */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-[600px] h-[600px] rounded-full bg-emerald-50 blur-3xl opacity-60" />
-          <div className="absolute -bottom-40 -left-40 w-[500px] h-[500px] rounded-full bg-teal-50 blur-3xl opacity-50" />
-        </div>
-
-        <div className="relative max-w-7xl mx-auto px-6 lg:px-8 py-16 lg:py-24">
-          <div className="grid lg:grid-cols-2 gap-12 items-center">
-            <div className="space-y-8">
-              <div className="inline-flex items-center gap-2 px-4 py-1.5 bg-emerald-50 border border-emerald-100 rounded-full">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-xs font-semibold text-emerald-700 uppercase tracking-wider">Welcome to WASPI Portal</span>
+            <MergedShape className="relative min-h-[460px] md:min-h-[500px]" cutoutClassName="hidden xl:block">
+              <Image
+                src="/waspi-event.png"
+                alt="WASPI conference event"
+                fill
+                priority
+                className="object-cover"
+                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1120px"
+              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/20" />
+              <GradualBlur
+                target="parent"
+                position="bottom"
+                height="7rem"
+                strength={2}
+                divCount={5}
+                curve="bezier"
+                exponential
+                opacity={1}
+                zIndex={8}
+              />
+              <div className="relative z-10">
+                <div className="px-8 pb-8 pt-12 sm:px-10 sm:pt-16 lg:px-14 xl:pb-16">
+                  <div className="max-w-3xl space-y-5">
+                    <p className="text-xs uppercase tracking-[0.2em] text-white/85">Workplace safety membership</p>
+                    <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
+                      Protecting Filipino Workers Through Unified Safety Action
+                    </h1>
+                    <p className="max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
+                      A non-stock, non-profit, non-government occupational safety and health advocacy group of
+                      professionals and entrepreneurs passionate about Safe Work and Safe Workplaces.
+                    </p>
+                    <div className="flex flex-wrap gap-4 pt-6 sm:pt-8">
+                      <Link href="/register">
+                        <Button
+                          className="rounded-full px-7 py-5 text-sm font-semibold text-black shadow-none hover:brightness-95"
+                          style={{ backgroundColor: palette.green }}
+                        >
+                          Become a Member
+                        </Button>
+                      </Link>
+                      <Link href="/membership/portal">
+                        <Button
+                          variant="outline"
+                          className="rounded-full border-white/50 bg-transparent px-7 py-5 text-sm text-white hover:bg-white/10"
+                        >
+                          Member Login
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
               </div>
 
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight text-gray-900">
-                Workplace Advocates on{' '}
-                <span className="text-emerald-600">Safety</span>{' '}
-                in the Philippines
-              </h1>
+              <div className="relative z-20 px-5 pb-6 sm:px-8 xl:pointer-events-none xl:absolute xl:inset-x-auto xl:bottom-0 xl:right-0 xl:w-[min(52%,520px)] xl:px-0 xl:pb-0">
+                <div className="dot-grid-bg pointer-events-auto grid grid-cols-1 gap-4 rounded-2xl bg-white p-5 shadow-sm sm:grid-cols-3 sm:gap-5 xl:rounded-none xl:rounded-tl-[28px] xl:shadow-none">
+                  {[
+                    ['1.2K+', 'Active members'],
+                    ['30+', 'Partner organizations'],
+                    ['120+', 'Safety sessions delivered'],
+                  ].map(([value, label]) => (
+                    <div key={label} className="min-w-0">
+                      <p className="text-2xl font-semibold sm:text-3xl" style={{ color: palette.dark }}>{value}</p>
+                      <p className="text-sm leading-5" style={{ color: palette.gray }}>{label}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </MergedShape>
+          </BorderGlow>
 
-              <p className="text-lg text-gray-500 leading-relaxed max-w-lg">
-                The official portal for WASPI members and event management. Access resources, manage your membership, or coordinate nationwide safety events.
+        </section>
+
+        <div
+          role="region"
+          aria-label="WASPI advocacy highlights"
+          data-marquee-scroll-slow
+          className="relative bg-transparent pt-6 pb-4 md:pt-8 md:pb-5"
+          style={typeStyle}
+        >
+          <div className="flex w-full justify-center px-0">
+            <ScrollFloat
+              animationDuration={1}
+              ease="back.inOut(2)"
+              scrollStart="center bottom+=50%"
+              scrollEnd="bottom bottom-=40%"
+              stagger={0.03}
+              containerClassName="my-0 mb-3 w-[min(92vw,_100%)] max-w-none overflow-visible px-0 text-center md:mb-6"
+              textClassName="font-black tracking-[-0.07em]"
+              charClassName="waspi-grain-char"
+              textStyle={{
+                fontSize: 'clamp(4rem, calc(92vw / 5.35), min(46vh, 38rem))',
+                lineHeight: 1,
+              }}
+            >
+              WASPI
+            </ScrollFloat>
+          </div>
+
+          {/* Side fade applies only to the marquee, not the title */}
+          <div className="relative overflow-hidden [mask-image:linear-gradient(to_right,transparent,black_14%,black_86%,transparent)] [-webkit-mask-image:linear-gradient(to_right,transparent,black_14%,black_86%,transparent)]">
+          <ScrollVelocity
+            texts={[MARQUEE_LINE_1, MARQUEE_LINE_2]}
+            velocity={72}
+            numCopies={6}
+            damping={50}
+            stiffness={400}
+            parallaxClassName="py-0.5"
+            scrollerClassName="!font-sans !font-semibold !tracking-normal !drop-shadow-none !text-md !leading-snug md:!text-lg md:!leading-normal"
+          />
+          </div>
+        </div>
+
+        <LandingSection
+          id="about"
+          className="scroll-mt-6 grid gap-7 px-5 pb-14 pt-8 sm:px-10 sm:pt-10 lg:grid-cols-2 lg:px-14"
+        >
+          <div>
+            <p className="text-sm font-medium" style={{ color: palette.green }}>About WASPI</p>
+            <h2 className="mt-4 text-3xl font-semibold leading-tight" style={{ color: palette.dark }}>
+              Building trusted communities around workplace safety.
+            </h2>
+            <p className="mt-5 max-w-xl text-sm leading-7 sm:text-base" style={{ color: palette.gray }}>
+              Workplace Advocates on Safety in the Philippines Inc. (WASPI) was conceptualized on September 12,
+              2013 and was granted its Certificate of Incorporation by the Securities and Exchange Commission
+              (SEC) on February 21, 2014.
+            </p>
+            <p className="mt-4 max-w-xl text-sm leading-7 sm:text-base" style={{ color: palette.gray }}>
+              WASPI conducts safety and health awareness forums and OSHE national conventions as avenues for
+              exchanging information, current trends, and technological innovations to enhance the safety culture
+              in the Philippines.
+            </p>
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+              {[
+                'National safety advocacy',
+                'Member knowledge sharing',
+                'Digital-first membership tools',
+                'Community-led initiatives',
+              ].map((item) => (
+                <div key={item} className="dot-grid-bg rounded-xl border border-[#E8EAEB] px-4 py-3 text-sm" style={{ color: palette.dark }}>
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-[28px] md:rounded-3xl">
+            <Image
+              src="/waspi-team.png"
+              alt="WASPI officers and members"
+              width={900}
+              height={600}
+              className="h-full w-full object-cover"
+            />
+          </div>
+        </LandingSection>
+
+        <LandingSection
+          id="mission"
+          className="scroll-mt-6 bg-white px-5 py-14 sm:px-10 lg:px-14"
+        >
+          <div className="grid gap-5 lg:grid-cols-3">
+            <article className="dot-grid-bg rounded-2xl border border-[#E8EAEB] p-6">
+              <p className="text-sm font-medium" style={{ color: palette.green }}>Mission</p>
+              <p className="mt-3 text-sm leading-7 sm:text-base" style={{ color: palette.gray }}>
+                Promote preventative safety and health culture through collaboration and networking with private
+                business enterprises and with the government to achieve accident-free, injury-free and
+                disease-free workplaces.
               </p>
+            </article>
 
-              <div className="flex flex-col sm:flex-row gap-4">
+            <article className="dot-grid-bg rounded-2xl border border-[#E8EAEB] p-6">
+              <p className="text-sm font-medium" style={{ color: palette.green }}>Vision</p>
+              <p className="mt-3 text-sm leading-7 sm:text-base" style={{ color: palette.gray }}>
+                To be the trusted strategic partner of government and private enterprises in workplace safety and
+                health advocacy.
+              </p>
+            </article>
+
+            <article className="dot-grid-bg rounded-2xl border border-[#E8EAEB] p-6">
+              <p className="text-sm font-medium" style={{ color: palette.green }}>Objectives</p>
+              <ul className="mt-3 list-disc space-y-2 pl-5 text-sm leading-7 sm:text-base" style={{ color: palette.gray }}>
+                <li>Assist the government in implementing and monitoring OSH standards.</li>
+                <li>
+                  Promote international cooperation to strengthen prevention culture, knowledge sharing, and best
+                  safety practices.
+                </li>
+              </ul>
+            </article>
+          </div>
+        </LandingSection>
+
+        <LandingSection id="benefits" className="scroll-mt-6 bg-transparent px-5 py-14 sm:px-10 lg:px-14">
+          <div className="max-w-3xl">
+            <p className="text-sm font-medium" style={{ color: palette.green }}>Membership Benefits</p>
+            <h3 className="mt-4 text-3xl font-semibold leading-tight" style={{ color: palette.dark }}>
+              Everything members need to lead safer workplaces.
+            </h3>
+          </div>
+
+          <div className="mt-8 flex w-full justify-center">
+            <MagicBento
+              cards={MEMBERSHIP_BENTO_CARDS}
+              className="w-full max-w-none"
+              textAutoHide
+              enableStars
+              enableSpotlight
+              enableBorderGlow={true}
+              enableTilt={false}
+              enableMagnetism
+              clickEffect
+              spotlightRadius={250}
+              particleCount={12}
+              glowColor="22, 163, 92"
+              disableAnimations={false}
+            />
+          </div>
+        </LandingSection>
+
+        <LandingSection className="bg-white px-5 py-14 sm:px-10 lg:px-14">
+          <div className="max-w-3xl">
+            <p className="text-sm font-medium" style={{ color: palette.green }}>Core Values</p>
+            <h4 className="mt-3 text-3xl font-semibold leading-tight" style={{ color: palette.dark }}>
+              W-A-S-P-I values that guide our advocacy.
+            </h4>
+          </div>
+          <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+            {[
+              [
+                'W - Workplace and Worker Focused',
+                'We focus our advocacy on safe work and safe workplaces to strengthen a culture of safety in the country.',
+              ],
+              [
+                'A - Action Oriented',
+                'We continuously coordinate and collaborate with other safety organizations to promote preventative safety and health culture.',
+              ],
+              [
+                'S - Shared Care and Concern',
+                'We provide technical assistance for workers and entrepreneurs in micro, small, and medium enterprises.',
+              ],
+              [
+                'P - Proactive Professional Development',
+                'We believe in continuous advancement of safety, health, and accident prevention technology.',
+              ],
+              [
+                'I - Involved and Informed',
+                'We promote international cooperation to share and gain knowledge on accident prevention culture for a safe and happy life.',
+              ],
+            ].map(([title, desc]) => (
+              <article key={title} className="dot-grid-bg rounded-2xl border border-[#E8EAEB] bg-[#F2F4F4] p-5">
+                <p className="text-sm font-semibold leading-6" style={{ color: palette.dark }}>{title}</p>
+                <p className="mt-3 text-sm leading-6" style={{ color: palette.gray }}>{desc}</p>
+              </article>
+            ))}
+          </div>
+        </LandingSection>
+
+        <LandingSection id="contact" className="scroll-mt-6 bg-[#1E1E1E] rounded-t-3xl px-5 py-14 text-white sm:px-10 lg:px-14">
+          <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
+            <div>
+              <p className="text-sm font-medium" style={{ color: palette.green }}>Ready to join?</p>
+              <h4 className="mt-3 text-3xl font-semibold leading-tight">
+                Support zero harm and stronger safety culture with WASPI.
+              </h4>
+              <p className="mt-4 max-w-2xl text-sm leading-7 text-white/80 sm:text-base">
+                Become part of a national network committed to practical workplace safety. Start with online
+                registration and access your member portal right away.
+              </p>
+              <div className="mt-7 flex flex-wrap gap-3">
                 <Link href="/register">
-                  <Button className="bg-emerald-600 hover:bg-emerald-700 text-white px-8 py-3 h-auto text-base font-semibold rounded-full shadow-lg shadow-emerald-200 hover:shadow-xl hover:shadow-emerald-300 transition-all cursor-pointer">
-                    Become a Member
+                  <Button
+                    className="rounded-full px-7 py-5 font-semibold text-black shadow-none hover:brightness-95"
+                    style={{ backgroundColor: palette.green }}
+                  >
+                    Register now
                   </Button>
                 </Link>
-                <Link href="/login">
-                  <Button variant="outline" className="border-emerald-600 text-emerald-700 hover:bg-emerald-50 hover:border-emerald-700 px-8 py-3 h-auto text-base font-semibold rounded-full transition-all cursor-pointer">
-                    Event Management
+                <Link href="/login?app=ems">
+                  <Button
+                    variant="outline"
+                    className="rounded-full border-white/40 bg-transparent px-7 py-5 text-white hover:bg-white/10"
+                  >
+                    Admin portal
                   </Button>
                 </Link>
               </div>
             </div>
 
-            <div className="relative flex justify-center lg:justify-end">
-              <div className="relative w-full max-w-lg">
-                <div className="absolute inset-0 bg-gradient-to-br from-emerald-100 to-teal-50 rounded-3xl -rotate-3 scale-105 opacity-60" />
-                <Image
-                  src="/hero-illustration.png"
-                  alt="Workplace safety illustration"
-                  width={600}
-                  height={500}
-                  className="relative rounded-2xl object-contain drop-shadow-xl"
-                  priority
-                />
-              </div>
+            <div className="dot-grid-bg rounded-3xl border border-white/15 bg-white/5 p-6">
+              <Image
+                src="/waspi-event.png"
+                alt="WASPI community event"
+                width={700}
+                height={460}
+                className="h-56 w-full rounded-2xl object-cover"
+              />
+              <p className="mt-4 text-sm text-white/75">
+                WASPI continues to empower safety champions through real-world collaboration and continuous learning.
+              </p>
             </div>
           </div>
-        </div>
-      </section>
 
-      {/* ───────── FOOTER ───────── */}
-      <footer className="border-t border-gray-100 bg-gray-50/40 py-12 px-6 lg:px-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="grid md:grid-cols-3 gap-10">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <span className="text-lg font-bold text-emerald-700">WASPI</span>
-              </div>
-              <p className="text-sm text-gray-500 leading-relaxed">
-                Workplace Advocates on Safety in the Philippines Inc. — promoting safety for every worker.
-              </p>
-            </div>
-            <div className="text-center md:text-right md:col-span-2">
-              <p className="text-sm text-gray-400">
-                © {new Date().getFullYear()} WASPI — Workplace Advocates on Safety in the Philippines Inc.
-              </p>
-            </div>
-          </div>
-        </div>
-      </footer>
-    </div>
+          <footer className="mt-12 border-t border-white/15 pt-6 text-sm text-white/65">
+            © {new Date().getFullYear()} WASPI — Workplace Advocates on Safety in the Philippines Inc.
+          </footer>
+        </LandingSection>
+      </div>
+    </main>
   )
 }

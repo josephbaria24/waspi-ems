@@ -54,7 +54,7 @@ export default function EventPage() {
             <Navigation currentEventId={id} />
             <EventDetails
                 eventId={id}
-                onBack={() => router.push("/")}
+                onBack={() => router.push("/events")}
             />
         </div>
     )

@@ -1,6 +1,9 @@
 // app/api/register/route.ts
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { NextRequest, NextResponse } from 'next/server'
+import { getMembershipSettings } from '@/lib/membership-settings-store'
+import { getPlan } from '@/lib/membership-settings'
+import { sendRegistrationEmail } from '@/lib/send-registration-email'
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,7 +26,20 @@ export async function POST(request: NextRequest) {
       cardExpiry,
       cardCVC,
       cardName,
+      wantsPhysicalId,
+      deliveryRecipient,
+      deliveryAddress,
+      deliveryCity,
+      deliveryProvince,
+      deliveryZip,
     } = body
+
+    const membershipSettings = await getMembershipSettings()
+    const selectedPlan = getPlan(membershipSettings, membershipType)
+    const membershipAmount = selectedPlan.price
+    const physicalIdFee = wantsPhysicalId ? membershipSettings.physicalIdFee : 0
+    const shippingFee = wantsPhysicalId ? membershipSettings.shippingFee : 0
+    const amountDue = membershipAmount + physicalIdFee + shippingFee
 
     console.log('Registration attempt for:', email)
 
@@ -117,6 +133,25 @@ export async function POST(request: NextRequest) {
     const trackingNumber = `WASPI-${Date.now()}-${Math.random().toString(36).substr(2, 5).toUpperCase()}`
     console.log('Creating membership tracking number:', trackingNumber)
     
+    const paymentDetails = {
+      method: paymentMethod || 'Pending',
+      membership_type: membershipType,
+      membership_amount: membershipAmount,
+      wants_physical_id: Boolean(wantsPhysicalId),
+      physical_id_fee: physicalIdFee,
+      shipping_fee: shippingFee,
+      amount_due: amountDue,
+      delivery: wantsPhysicalId
+        ? {
+            recipient: deliveryRecipient,
+            address: deliveryAddress,
+            city: deliveryCity,
+            province: deliveryProvince,
+            zip: deliveryZip,
+          }
+        : null,
+    }
+
     const { error: membershipError } = await supabaseAdmin
       .from('members')
       .insert({
@@ -125,6 +160,7 @@ export async function POST(request: NextRequest) {
         status: 'Pending',
         payment_status: 'Pending',
         payment_method: paymentMethod || 'Pending',
+        payment_details: paymentDetails,
         tracking_number: trackingNumber,
       })
 
@@ -158,12 +194,25 @@ export async function POST(request: NextRequest) {
       .insert({
         user_id: userId,
         email,
-        provider: paymentMethod === 'paypal' ? 'paypal' : 'card',
+        provider: paymentMethod || 'bank',
         event_type: 'registration_initiated',
-        amount: membershipType === 'standard' ? 100 : membershipType === 'premium' ? 150 : 300,
+        amount: amountDue,
         currency: 'php',
         raw: {
           method: paymentMethod,
+          membership_amount: membershipAmount,
+          wants_physical_id: Boolean(wantsPhysicalId),
+          physical_id_fee: physicalIdFee,
+          shipping_fee: shippingFee,
+          delivery: wantsPhysicalId
+            ? {
+                recipient: deliveryRecipient,
+                address: deliveryAddress,
+                city: deliveryCity,
+                province: deliveryProvince,
+                zip: deliveryZip,
+              }
+            : null,
           masked_card: cardNumber ? cardNumber.slice(-4) : null,
         },
       })
@@ -183,9 +232,35 @@ export async function POST(request: NextRequest) {
         details: {
           email,
           membership_type: membershipType,
+          wants_physical_id: Boolean(wantsPhysicalId),
+          physical_id_fee: physicalIdFee,
+          shipping_fee: shippingFee,
+          amount_due: amountDue,
+          delivery_address: wantsPhysicalId
+            ? `${deliveryRecipient}, ${deliveryAddress}, ${deliveryCity}, ${deliveryProvince} ${deliveryZip}`
+            : null,
           timestamp: new Date().toISOString(),
         },
       })
+
+    try {
+      await sendRegistrationEmail({
+        email,
+        fullName: `${firstName} ${lastName}`.trim(),
+        trackingNumber,
+        membershipType,
+        paymentMethod,
+        wantsPhysicalId: Boolean(wantsPhysicalId),
+        physicalIdFee,
+        shippingFee,
+        totalDue: amountDue,
+        deliveryAddress: wantsPhysicalId
+          ? [deliveryRecipient, deliveryAddress, deliveryCity, deliveryProvince, deliveryZip].filter(Boolean).join(", ")
+          : "",
+      })
+    } catch (emailError) {
+      console.error('Registration email error:', emailError)
+    }
 
     console.log('Registration successful for:', email)
     return NextResponse.json(

@@ -14,47 +14,54 @@ export default function UploadReceiptPage() {
   const trackingFromUrl = searchParams.get('tracking') || ''
 
   const [trackingNumber, setTrackingNumber] = useState(trackingFromUrl)
-  const [file, setFile] = useState<File | null>(null)
-  const [preview, setPreview] = useState<string | null>(null)
+  const [files, setFiles] = useState<File[]>([])
+  const [previews, setPreviews] = useState<string[]>([])
   const [isUploading, setIsUploading] = useState(false)
   const [uploadSuccess, setUploadSuccess] = useState(false)
+  const [uploadedCount, setUploadedCount] = useState(0)
   const [error, setError] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const selected = e.target.files?.[0]
-    if (!selected) return
+    const selected = Array.from(e.target.files || [])
+    if (selected.length === 0) return
 
-    // Validate file type
     const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'application/pdf']
-    if (!allowedTypes.includes(selected.type)) {
-      setError('Please upload a JPG, PNG, WebP image or PDF file.')
-      return
+    const nextFiles: File[] = []
+    const nextPreviews: string[] = []
+
+    for (const item of selected) {
+      if (!allowedTypes.includes(item.type)) {
+        setError('Please upload JPG, PNG, WebP, or PDF files.')
+        continue
+      }
+      if (item.size > 10 * 1024 * 1024) {
+        setError('Each file must be less than 10MB.')
+        continue
+      }
+      nextFiles.push(item)
+      if (item.type.startsWith('image/')) {
+        nextPreviews.push(URL.createObjectURL(item))
+      } else {
+        nextPreviews.push('')
+      }
     }
 
-    // Validate file size (max 10MB)
-    if (selected.size > 10 * 1024 * 1024) {
-      setError('File size must be less than 10MB.')
-      return
+    if (nextFiles.length) {
+      setFiles((prev) => [...prev, ...nextFiles])
+      setPreviews((prev) => [...prev, ...nextPreviews])
+      setError('')
     }
-
-    setFile(selected)
-    setError('')
-
-    // Generate preview for images
-    if (selected.type.startsWith('image/')) {
-      const reader = new FileReader()
-      reader.onload = (ev) => setPreview(ev.target?.result as string)
-      reader.readAsDataURL(selected)
-    } else {
-      setPreview(null)
-    }
+    if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
-  const removeFile = () => {
-    setFile(null)
-    setPreview(null)
-    if (fileInputRef.current) fileInputRef.current.value = ''
+  const removeFile = (index: number) => {
+    setFiles((prev) => prev.filter((_, i) => i !== index))
+    setPreviews((prev) => {
+      const url = prev[index]
+      if (url) URL.revokeObjectURL(url)
+      return prev.filter((_, i) => i !== index)
+    })
   }
 
   const handleUpload = async () => {
@@ -62,8 +69,8 @@ export default function UploadReceiptPage() {
       setError('Please enter your tracking number.')
       return
     }
-    if (!file) {
-      setError('Please select a file to upload.')
+    if (files.length === 0) {
+      setError('Please select at least one receipt.')
       return
     }
 
@@ -72,7 +79,7 @@ export default function UploadReceiptPage() {
 
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      files.forEach((item) => formData.append('file', item))
       formData.append('trackingNumber', trackingNumber.trim())
 
       const res = await fetch('/api/membership/upload-receipt', {
@@ -87,6 +94,7 @@ export default function UploadReceiptPage() {
         return
       }
 
+      setUploadedCount(data.receipts?.length || files.length)
       setUploadSuccess(true)
     } catch (err) {
       console.error('Upload error:', err)
@@ -114,7 +122,7 @@ export default function UploadReceiptPage() {
                     Receipt Uploaded!
                   </h2>
                   <p className="text-muted-foreground max-w-sm mx-auto">
-                    Your payment receipt has been submitted for tracking number <strong className="text-primary font-mono">{trackingNumber}</strong>.
+                    {uploadedCount} receipt{uploadedCount === 1 ? '' : 's'} submitted for tracking number <strong className="text-primary font-mono">{trackingNumber}</strong>.
                   </p>
                 </div>
                 <div className="bg-primary/5 border border-primary/20 rounded-lg p-4 max-w-sm mx-auto text-left space-y-2">
@@ -154,7 +162,7 @@ export default function UploadReceiptPage() {
                 Upload Payment Receipt
               </CardTitle>
               <CardDescription>
-                Submit your payment receipt for verification
+                Submit one or more payment receipts for verification
               </CardDescription>
             </CardHeader>
             <CardContent className="p-6 space-y-6">
@@ -178,57 +186,56 @@ export default function UploadReceiptPage() {
               {/* File Upload Area */}
               <div className="space-y-2">
                 <Label className="text-foreground font-medium">
-                  Payment Receipt *
+                  Payment receipts *
                 </Label>
-                
-                {!file ? (
-                  <div
-                    onClick={() => fileInputRef.current?.click()}
-                    className="border-2 border-dashed border-primary/30 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
-                  >
-                    <FileImage className="h-10 w-10 text-primary/40 mx-auto mb-3" />
-                    <p className="text-sm font-medium text-foreground">
-                      Click to upload your receipt
-                    </p>
-                    <p className="text-xs text-muted-foreground mt-1">
-                      JPG, PNG, WebP or PDF — Max 10MB
-                    </p>
-                  </div>
-                ) : (
-                  <div className="border border-primary/20 rounded-lg p-4 space-y-3">
-                    {preview && (
-                      <div className="relative rounded-lg overflow-hidden bg-muted">
-                        <img
-                          src={preview}
-                          alt="Receipt preview"
-                          className="w-full max-h-64 object-contain"
-                        />
+
+                <div
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-primary/30 rounded-lg p-8 text-center cursor-pointer hover:border-primary/50 hover:bg-primary/5 transition-all"
+                >
+                  <FileImage className="h-10 w-10 text-primary/40 mx-auto mb-3" />
+                  <p className="text-sm font-medium text-foreground">
+                    Click to add one or more receipts
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    JPG, PNG, WebP or PDF — Max 10MB each
+                  </p>
+                </div>
+
+                {files.length > 0 && (
+                  <div className="space-y-3">
+                    {files.map((item, index) => (
+                      <div key={`${item.name}-${index}`} className="border border-primary/20 rounded-lg p-3 space-y-2">
+                        {previews[index] && (
+                          <img
+                            src={previews[index]}
+                            alt={`Receipt ${index + 1}`}
+                            className="w-full max-h-40 object-contain rounded-md bg-muted"
+                          />
+                        )}
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <FileImage className="h-4 w-4 text-primary shrink-0" />
+                            <span className="text-sm text-foreground truncate">{item.name}</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => removeFile(index)}
+                            className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive"
+                            aria-label="Remove receipt"
+                          >
+                            <X className="h-4 w-4" />
+                          </button>
+                        </div>
                       </div>
-                    )}
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2 min-w-0">
-                        <FileImage className="h-4 w-4 text-primary shrink-0" />
-                        <span className="text-sm text-foreground truncate">
-                          {file.name}
-                        </span>
-                        <span className="text-xs text-muted-foreground shrink-0">
-                          ({(file.size / 1024).toFixed(0)} KB)
-                        </span>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={removeFile}
-                        className="p-1 rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors shrink-0"
-                      >
-                        <X className="h-4 w-4" />
-                      </button>
-                    </div>
+                    ))}
                   </div>
                 )}
 
                 <input
                   ref={fileInputRef}
                   type="file"
+                  multiple
                   accept="image/jpeg,image/png,image/webp,application/pdf"
                   onChange={handleFileSelect}
                   className="hidden"
@@ -255,17 +262,18 @@ export default function UploadReceiptPage() {
                     <p className="font-mono text-foreground font-semibold">0912 345 6789</p>
                   </div>
                 </div>
-                <div className="bg-background rounded-lg p-3 border border-border">
-                  <p className="text-xs text-muted-foreground font-medium uppercase mb-1">Bank Transfer (BPI)</p>
-                  <p className="text-sm"><span className="text-muted-foreground">Account:</span> <span className="font-semibold">WASPI ORG</span></p>
-                  <p className="text-sm"><span className="text-muted-foreground">Number:</span> <span className="font-mono font-semibold">1234-5678-90</span></p>
+                <div className="bg-background rounded-lg p-3 border border-border space-y-1">
+                  <p className="text-xs text-muted-foreground font-medium uppercase mb-1">Bank Transfer</p>
+                  <p className="text-sm"><span className="text-muted-foreground">Bank / Branch:</span> <span className="font-semibold">Landbank of the Philippines / Davao City</span></p>
+                  <p className="text-sm"><span className="text-muted-foreground">Savings Account Name:</span> <span className="font-semibold">Workplace Advocates on Safety in the Philippines, Inc.</span></p>
+                  <p className="text-sm"><span className="text-muted-foreground">Bank Account Number:</span> <span className="font-mono font-semibold">5911-0175-73</span></p>
                 </div>
               </div>
 
               {/* Submit Button */}
               <Button
                 onClick={handleUpload}
-                disabled={isUploading || !file || !trackingNumber.trim()}
+                disabled={isUploading || files.length === 0 || !trackingNumber.trim()}
                 className="w-full bg-primary hover:bg-primary/90 text-primary-foreground disabled:opacity-50"
               >
                 {isUploading ? (
@@ -276,7 +284,7 @@ export default function UploadReceiptPage() {
                 ) : (
                   <>
                     <Upload className="h-4 w-4 mr-2" />
-                    Submit Receipt
+                    Submit {files.length > 1 ? `${files.length} receipts` : 'Receipt'}
                   </>
                 )}
               </Button>

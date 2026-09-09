@@ -1,12 +1,34 @@
 "use client"
 
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import type React from "react"
-import { Calendar, Settings, LogOut, Bell, Search, QrCode, Users } from "lucide-react"
+import { Settings, LogOut, Bell, Search, QrCode, Users, FileUp, UserPlus, Ticket } from "lucide-react"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase-client"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 import { useRouter } from "next/navigation"
+
+type NotificationItem = {
+  id: string
+  type: "registration" | "receipt" | "attendee"
+  title: string
+  description: string
+  createdAt: string
+  href: string
+}
+
+const SEEN_KEY = "waspi-notif-seen"
+
+function timeAgo(value: string) {
+  const diff = Date.now() - new Date(value).getTime()
+  const minutes = Math.max(1, Math.floor(diff / 60000))
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  if (hours < 24) return `${hours}h ago`
+  const days = Math.floor(hours / 24)
+  return `${days}d ago`
+}
 
 interface NavigationProps {
   currentEventId?: string | null
@@ -106,14 +128,7 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
               />
             </div>
 
-            {/* Bell */}
-            <button
-              className="relative p-2 text-muted-foreground hover:text-foreground"
-              onClick={handleComingSoon}
-            >
-              <Bell className="h-5 w-5" />
-              <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-primary"></span>
-            </button>
+            <NotificationBell />
 
             {/* Logout */}
             <button
@@ -140,6 +155,135 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
         <QrCode className="h-6 w-6" />
       </button>
     </>
+  )
+}
+
+function NotificationBell() {
+  const router = useRouter()
+  const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [items, setItems] = useState<NotificationItem[]>([])
+  const [seen, setSeen] = useState<string[]>([])
+
+  useEffect(() => {
+    try {
+      setSeen(JSON.parse(localStorage.getItem(SEEN_KEY) || "[]"))
+    } catch {
+      setSeen([])
+    }
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    const load = async () => {
+      if (items.length === 0) setLoading(true)
+      try {
+        const response = await fetch("/api/notifications")
+        const result = await response.json()
+        if (!cancelled && response.ok) {
+          setItems(result.notifications || [])
+        }
+      } catch {
+        if (!cancelled) setItems([])
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    load()
+    return () => {
+      cancelled = true
+    }
+  }, [open])
+
+  const unread = items.filter((item) => !seen.includes(item.id)).length
+
+  const markAllRead = () => {
+    const ids = Array.from(new Set([...seen, ...items.map((item) => item.id)]))
+    setSeen(ids)
+    localStorage.setItem(SEEN_KEY, JSON.stringify(ids))
+  }
+
+  const markOneRead = (id: string) => {
+    if (seen.includes(id)) return
+    const ids = [...seen, id]
+    setSeen(ids)
+    localStorage.setItem(SEEN_KEY, JSON.stringify(ids))
+  }
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          className="relative rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          aria-label="Notifications"
+        >
+          <Bell className="h-5 w-5" />
+          {unread > 0 && (
+            <span className="absolute right-0.5 top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#00D47E] px-1 text-[10px] font-bold text-black">
+              {unread > 9 ? "9+" : unread}
+            </span>
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        align="end"
+        sideOffset={10}
+        className="w-[min(92vw,380px)] overflow-hidden rounded-2xl border border-[#E8EAEB] p-0 shadow-[0_16px_40px_rgba(15,23,42,0.12)]"
+      >
+        <div className="flex items-start justify-between gap-3 border-b border-[#E8EAEB] px-4 py-3">
+          <div>
+            <p className="text-sm font-semibold text-foreground">Notifications</p>
+            <p className="text-xs text-muted-foreground">Registrations, receipts, and event sign-ups</p>
+          </div>
+          <button
+            type="button"
+            onClick={markAllRead}
+            disabled={unread === 0}
+            className="shrink-0 pt-0.5 text-xs font-medium text-[#16a35c] transition-opacity hover:underline disabled:cursor-default disabled:text-muted-foreground disabled:no-underline disabled:opacity-60"
+          >
+            Mark all as read
+          </button>
+        </div>
+        <div className="max-h-[420px] overflow-y-auto">
+          {loading ? (
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">Loading notifications…</p>
+          ) : items.length === 0 ? (
+            <p className="px-4 py-8 text-center text-sm text-muted-foreground">No activity yet.</p>
+          ) : (
+            items.map((item) => {
+              const Icon = item.type === "receipt" ? FileUp : item.type === "attendee" ? Ticket : UserPlus
+              const isUnread = !seen.includes(item.id)
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => {
+                    markOneRead(item.id)
+                    setOpen(false)
+                    router.push(item.href)
+                  }}
+                  className={`flex w-full items-start gap-3 border-b border-[#F2F4F4] px-4 py-3 text-left transition-colors last:border-0 hover:bg-[#F7FBF8] ${isUnread ? "bg-[#F4FBF7]" : ""}`}
+                >
+                  <span className="relative mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#EAF9F1] text-[#16a35c]">
+                    <Icon className="h-4 w-4" />
+                    {isUnread && (
+                      <span className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full border-2 border-white bg-[#00D47E]" />
+                    )}
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className={`block text-sm ${isUnread ? "font-semibold" : "font-medium"} text-foreground`}>{item.title}</span>
+                    <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{item.description}</span>
+                    <span className="mt-1 block text-[11px] text-[#8D959D]">{timeAgo(item.createdAt)}</span>
+                  </span>
+                </button>
+              )
+            })
+          )}
+        </div>
+      </PopoverContent>
+    </Popover>
   )
 }
 

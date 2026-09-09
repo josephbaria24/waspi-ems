@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useRef } from "react";
+import { useEffect, useState, useRef } from "react";
+import Link from "next/link";
+import { supabase } from "@/lib/supabase-client";
 import {
-    LogIn, Upload, CheckCircle2, Clock, XCircle,
+    Upload, CheckCircle2, Clock, XCircle,
     FileImage, Loader2, Eye, EyeOff, ArrowLeft,
     Maximize2, Download, ShieldCheck
 } from "lucide-react";
@@ -37,6 +39,8 @@ type MembershipData = {
         status: string;
         paymentStatus: string;
         receiptUrl: string | null;
+        receipts?: { url: string; uploadedAt: string | null }[];
+        declineReason?: string | null;
         receiptUploadedAt: string | null;
         expiryDate: string;
         createdAt: string;
@@ -56,6 +60,29 @@ export default function MemberPortalPage() {
     const [data, setData] = useState<MembershipData | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const cardPrintRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        let cancelled = false;
+
+        const restoreSession = async () => {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (!session?.access_token) return;
+
+            const response = await fetch("/api/membership/session", {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+            });
+            if (!response.ok || cancelled) return;
+
+            const result = await response.json();
+            setData(result);
+            setIsLoggedIn(true);
+        };
+
+        restoreSession();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -217,8 +244,14 @@ export default function MemberPortalPage() {
                 membership: {
                     ...prev.membership,
                     receiptUrl: result.receiptUrl,
+                    receipts: [
+                        ...(prev.membership.receipts || []),
+                        ...(result.receipts || [{ url: result.receiptUrl, uploadedAt: new Date().toISOString() }]),
+                    ],
                     receiptUploadedAt: new Date().toISOString(),
                     paymentStatus: "Under Review",
+                    status: "Pending",
+                    declineReason: null,
                 }
             } : null);
 
@@ -259,85 +292,94 @@ export default function MemberPortalPage() {
     // ==================== LOGIN SCREEN ====================
     if (!isLoggedIn) {
         return (
-            <main className="min-h-screen bg-[#017C7C] bg-gradient-to-br from-[#017C7C] via-[#018c8c] to-[#016c6c]">
-                <div className="container relative z-10 mx-auto px-4 py-12 md:py-24 flex flex-col items-center">
-                    <div className="w-full max-w-md">
-                        <div className="text-center mb-10 text-white">
-                            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2">
-                                Member Portal
+            <main
+                className="dot-grid-bg min-h-screen bg-white"
+                style={{ fontFamily: "Aeonik, Geist, -apple-system, BlinkMacSystemFont, sans-serif" }}
+            >
+                <div className="mx-auto flex min-h-screen w-[min(94vw,560px)] flex-col px-5 py-6 sm:px-8 sm:py-10">
+                    <Link
+                        href="/"
+                        className="inline-flex w-fit items-center gap-2 rounded-full border border-[#E8EAEB] bg-white px-4 py-2 text-sm font-medium text-[#1E1E1E] shadow-sm transition-colors hover:bg-[#F2F4F4]"
+                    >
+                        <ArrowLeft className="h-4 w-4" />
+                        Back
+                    </Link>
+
+                    <div className="flex flex-1 flex-col justify-center py-8">
+                        <div className="mb-8 text-center">
+                            <img
+                                src="/logo.png"
+                                alt="WASPI logo"
+                                className="mx-auto mb-5 h-12 w-12 rounded-xl object-contain"
+                            />
+                            <p className="text-xs font-medium uppercase tracking-[0.2em] text-[#00D47E]">
+                                Member portal
+                            </p>
+                            <h1 className="mt-3 text-3xl font-semibold leading-tight text-[#1E1E1E] sm:text-4xl">
+                                Sign in to your membership
                             </h1>
-                            <p className="text-white/70">
-                                Track your membership and upload payment receipt
+                            <p className="mx-auto mt-3 max-w-md text-sm leading-6 text-[#8D959D]">
+                                Track your application, upload a payment receipt, and view your membership details.
                             </p>
                         </div>
 
-                        <Card className="border-2 border-primary/20 shadow-xl">
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <LogIn className="h-5 w-5" />
-                                    Sign In
-                                </CardTitle>
-                                <CardDescription>
-                                    Use your registration email and password
-                                </CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <form onSubmit={handleLogin} className="space-y-4">
-                                    <div className="space-y-2">
-                                        <Label htmlFor="email">Email</Label>
-                                        <Input
-                                            id="email"
-                                            type="email"
-                                            placeholder="your@email.com"
-                                            value={email}
-                                            onChange={(e) => setEmail(e.target.value)}
-                                            required
-                                        />
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label htmlFor="password">Password</Label>
-                                        <div className="relative">
-                                            <Input
-                                                id="password"
-                                                type={showPassword ? "text" : "password"}
-                                                placeholder="Your password"
-                                                value={password}
-                                                onChange={(e) => setPassword(e.target.value)}
-                                                required
-                                                className="pr-10"
-                                            />
-                                            <button
-                                                type="button"
-                                                onClick={() => setShowPassword(!showPassword)}
-                                                className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                                            >
-                                                {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                                            </button>
-                                        </div>
-                                    </div>
-                                    <Button
-                                        type="submit"
-                                        disabled={isLoading}
-                                        className="w-full bg-primary hover:bg-primary/90 text-primary-foreground"
-                                    >
-                                        {isLoading ? (
-                                            <><Loader2 className="h-4 w-4 mr-2 animate-spin" /> Signing in...</>
-                                        ) : (
-                                            "Sign In"
-                                        )}
-                                    </Button>
-                                </form>
-
-                                <div className="mt-4 text-center">
-                                    <a
-                                        href="/membership/register"
-                                        className="text-sm text-primary hover:underline"
-                                    >
-                                        Don&apos;t have an account? Register here
-                                    </a>
+                        <div className="rounded-[28px] border border-[#E8EAEB] bg-white p-6 shadow-[0_8px_28px_rgba(15,23,42,0.06)] sm:p-8">
+                            <form onSubmit={handleLogin} className="space-y-5">
+                                <div className="space-y-2">
+                                    <Label htmlFor="email" className="text-[#1E1E1E]">Email</Label>
+                                    <Input
+                                        id="email"
+                                        type="email"
+                                        placeholder="you@example.com"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        required
+                                        className="h-11 rounded-xl border-[#E8EAEB] bg-white focus-visible:border-[#00D47E] focus-visible:ring-[#00D47E]/30"
+                                    />
                                 </div>
-                            </CardContent>
-                        </Card>
+                                <div className="space-y-2">
+                                    <Label htmlFor="password" className="text-[#1E1E1E]">Password</Label>
+                                    <div className="relative">
+                                        <Input
+                                            id="password"
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="Your password"
+                                            value={password}
+                                            onChange={(e) => setPassword(e.target.value)}
+                                            required
+                                            className="h-11 rounded-xl border-[#E8EAEB] bg-white pr-10 focus-visible:border-[#00D47E] focus-visible:ring-[#00D47E]/30"
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-[#8D959D] hover:text-[#1E1E1E]"
+                                            aria-label={showPassword ? "Hide password" : "Show password"}
+                                        >
+                                            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                        </button>
+                                    </div>
+                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading}
+                                    className="h-11 w-full rounded-full text-sm font-semibold text-black shadow-none hover:brightness-95"
+                                    style={{ backgroundColor: "#00D47E" }}
+                                >
+                                    {isLoading ? (
+                                        <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in...</>
+                                    ) : (
+                                        "Sign in"
+                                    )}
+                                </Button>
+                            </form>
+
+                            <p className="mt-6 text-center text-sm text-[#8D959D]">
+                                Don&apos;t have an account?{" "}
+                                <Link href="/register" className="font-medium text-[#1E1E1E] hover:underline">
+                                    Register here
+                                </Link>
+                            </p>
+                        </div>
                     </div>
                 </div>
             </main>
@@ -532,32 +574,44 @@ export default function MemberPortalPage() {
                                         <CheckCircle2 className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
                                         <div>
                                             <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                                                Receipt uploaded successfully
+                                                {(data!.membership.receipts?.length || 1)} receipt{(data!.membership.receipts?.length || 1) === 1 ? "" : "s"} uploaded
                                             </p>
                                             <p className="text-xs text-green-600/70 dark:text-green-500/70 mt-1">
-                                                Uploaded on {new Date(data!.membership.receiptUploadedAt!).toLocaleString()}
+                                                You can add another receipt if you have more than one payment.
                                             </p>
                                         </div>
                                     </div>
-                                    <div className="border rounded-lg overflow-hidden">
-                                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                                        <img
-                                            src={data!.membership.receiptUrl}
-                                            alt="Payment Receipt"
-                                            className="w-full max-h-96 object-contain bg-muted/30"
-                                        />
-                                    </div>
+                                    {(data!.membership.receipts?.length
+                                        ? data!.membership.receipts
+                                        : [{ url: data!.membership.receiptUrl!, uploadedAt: data!.membership.receiptUploadedAt }]
+                                    ).map((receipt, index) => (
+                                        <div key={`${receipt.url}-${index}`} className="space-y-1">
+                                            <p className="text-xs text-muted-foreground">Receipt {index + 1}</p>
+                                            <div className="border rounded-lg overflow-hidden">
+                                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                                <img
+                                                    src={receipt.url}
+                                                    alt={`Payment Receipt ${index + 1}`}
+                                                    className="w-full max-h-72 object-contain bg-muted/30"
+                                                />
+                                            </div>
+                                        </div>
+                                    ))}
 
                                     {/* Action Buttons for already uploaded receipt */}
                                     <div className="flex flex-col gap-3">
-                                        {data!.membership.paymentStatus === "Declined" ? (
+                                        {data!.membership.paymentStatus === "Declined" || data!.membership.status === "Declined" ? (
                                             <div className="bg-red-500/10 border border-red-500/20 rounded-lg p-4">
-                                                <p className="text-sm text-red-700 dark:text-red-400 mb-3">
-                                                    Your receipt was declined. Please upload a new one.
+                                                <p className="text-sm font-semibold text-red-700 dark:text-red-400">
+                                                    Your receipt was declined
+                                                </p>
+                                                <p className="mt-2 mb-3 text-sm text-red-700/90 dark:text-red-400">
+                                                    {data!.membership.declineReason || "Please upload a new receipt so we can review it again."}
                                                 </p>
                                                 <input
                                                     ref={fileInputRef}
                                                     type="file"
+                                                    multiple
                                                     accept="image/jpeg,image/png,image/webp,application/pdf"
                                                     onChange={handleFileSelect}
                                                     className="hidden"
@@ -576,6 +630,7 @@ export default function MemberPortalPage() {
                                                 <input
                                                     ref={fileInputRef}
                                                     type="file"
+                                                    multiple
                                                     accept="image/jpeg,image/png,image/webp,application/pdf"
                                                     onChange={handleFileSelect}
                                                     className="hidden"
@@ -586,10 +641,10 @@ export default function MemberPortalPage() {
                                                     variant="ghost"
                                                     className="w-full text-muted-foreground hover:text-primary hover:bg-primary/5 border border-dashed border-muted-foreground/20"
                                                 >
-                                                    <Upload className="h-4 w-4 mr-2" />Upload Another Receipt
+                                                    <Upload className="h-4 w-4 mr-2" />Upload another receipt
                                                 </Button>
                                                 <p className="text-[10px] text-center text-muted-foreground mt-2 italic">
-                                                    Note: Uploading another will replace your current receipt.
+                                                    Extra receipts are added. Earlier ones stay on file.
                                                 </p>
                                             </div>
                                         )}

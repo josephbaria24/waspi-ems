@@ -88,7 +88,7 @@ export function MembershipCard3D({
 
   return (
     <div
-      className="perspective-1000 cursor-pointer"
+      className="perspective-1000 w-full cursor-pointer"
       style={{ perspective: '1000px' }}
       onClick={onSelect}
     >
@@ -96,12 +96,11 @@ export function MembershipCard3D({
         ref={cardRef}
         onMouseMove={handleMouseMove}
         onMouseLeave={handleMouseLeave}
-        className={`relative rounded-xl transition-all duration-200 ease-out ${
-          selected ? 'ring-4 ring-primary ring-offset-2 scale-105' : 'hover:scale-[1.02]'
+        className={`relative h-[128px] w-full rounded-xl transition-all duration-200 ease-out sm:h-[164px] lg:h-[202px] ${
+          selected ? 'ring-2 ring-primary ring-offset-1 sm:ring-4 sm:ring-offset-2' : 'hover:brightness-[1.03]'
         }`}
         style={{
-          width: '320px',
-          height: '202px',
+          width: '100%',
           transform: `rotateX(${rotateX}deg) rotateY(${rotateY}deg)`,
           transformStyle: 'preserve-3d',
         }}
@@ -134,17 +133,17 @@ export function MembershipCard3D({
             </div>
           </div>
 
-          <div className="relative z-10 p-5 h-full flex flex-col justify-between">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className={`text-[10px] font-bold ${style.text} opacity-70 uppercase tracking-widest`}>
+          <div className="relative z-10 flex h-full flex-col justify-between p-3 sm:p-4 lg:p-5">
+            <div className="flex items-start justify-between gap-2">
+              <div className="min-w-0">
+                <p className={`text-[9px] font-bold uppercase tracking-widest opacity-70 sm:text-[10px] ${style.text}`}>
                   WASPI {variant === 'display' ? style.label : ''}
                 </p>
-                <h3 className={`text-xl font-bold ${style.text} mt-0.5 truncate max-w-[200px]`}>{name}</h3>
+                <h3 className={`mt-0.5 truncate text-sm font-bold sm:text-lg lg:text-xl ${style.text}`}>{name}</h3>
               </div>
-              <div className={`w-10 h-7 rounded bg-gradient-to-br ${style.chip} shadow-inner`}>
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="w-6 h-4 border border-yellow-800/30 rounded-sm" />
+              <div className={`h-5 w-7 shrink-0 rounded bg-gradient-to-br sm:h-6 sm:w-8 lg:h-7 lg:w-10 ${style.chip} shadow-inner`}>
+                <div className="flex h-full w-full items-center justify-center">
+                  <div className="h-3 w-4 rounded-sm border border-yellow-800/30 sm:h-4 sm:w-6" />
                 </div>
               </div>
             </div>
@@ -152,8 +151,8 @@ export function MembershipCard3D({
             <div>
               {variant === 'select' ? (
                 <div className="flex items-baseline gap-1">
-                  <span className={`text-2xl font-bold ${style.text}`}>{price.split('/')[0]}</span>
-                  <span className={`text-sm ${style.text} opacity-70`}>/{price.split('/')[1] || 'mo'}</span>
+                  <span className={`text-base font-bold sm:text-xl lg:text-2xl ${style.text}`}>{price.split('/')[0]}</span>
+                  <span className={`text-xs opacity-70 sm:text-sm ${style.text}`}>/{price.split('/')[1] || 'mo'}</span>
                 </div>
               ) : (
                 <div className="space-y-1">
@@ -164,10 +163,10 @@ export function MembershipCard3D({
                 </div>
               )}
               
-              <div className="flex justify-between items-end mt-2">
-                <div className="flex gap-2">
+              <div className="mt-1 flex items-end justify-between sm:mt-2">
+                <div className="flex gap-1.5 sm:gap-2">
                   {[...Array(4)].map((_, i) => (
-                    <span key={i} className={`text-[10px] ${style.text} opacity-40 font-mono tracking-widest`}>
+                    <span key={i} className={`font-mono text-[8px] tracking-widest opacity-40 sm:text-[10px] ${style.text}`}>
                       ••••
                     </span>
                   ))}
