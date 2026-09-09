@@ -7,7 +7,7 @@ interface StepperProps extends HTMLAttributes<HTMLDivElement> {
   value?: number;
   onValueChange?: (step: number) => void;
   onStepChange?: (step: number) => void;
-  onFinalStepCompleted?: () => void;
+  onFinalStepCompleted?: () => void | boolean | Promise<void | boolean>;
   onBeforeNext?: (currentStep: number) => boolean | Promise<boolean>;
   onBeforeBack?: (currentStep: number) => boolean | Promise<boolean>;
   stepCircleContainerClassName?: string;
@@ -96,8 +96,8 @@ export default function Stepper({
       const canMove = await onBeforeNext(currentStep);
       if (!canMove) return;
     }
-    setDirection(1);
-    updateStep(totalSteps + 1);
+    const completed = await onFinalStepCompleted();
+    if (completed === false) return;
   };
 
   return (
@@ -186,7 +186,7 @@ export default function Stepper({
                 className="rounded-full bg-[#00D47E] px-5 py-2 text-sm font-semibold text-[#0B1F14] transition-colors hover:bg-[#00c174] active:scale-[0.98]"
                 {...nextButtonProps}
               >
-                {isLastStep ? 'Complete Registration' : nextButtonText}
+                {isLastStep ? (nextButtonProps.disabled ? 'Submitting...' : 'Complete Registration') : nextButtonText}
               </button>
             </div>
           </div>

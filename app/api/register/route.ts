@@ -70,12 +70,28 @@ export async function POST(request: NextRequest) {
       // Continue anyway - the createUser will catch duplicate emails
     }
 
-    const userExists = existingUsers?.users?.some(user => user.email?.toLowerCase() === email.toLowerCase())
+    const existingUser = existingUsers?.users?.find(user => user.email?.toLowerCase() === email.toLowerCase())
     
-    if (userExists) {
+    if (existingUser) {
       console.log('User already exists')
+      const { data: existingMember } = await supabaseAdmin
+        .from("members")
+        .select("tracking_number")
+        .eq("profile_id", existingUser.id)
+        .maybeSingle()
+
+      const tracking = existingMember?.tracking_number as string | undefined
+      if (tracking) {
+        return NextResponse.json({
+          success: true,
+          alreadyRegistered: true,
+          trackingNumber: tracking,
+          message: "This email is already registered. Use the tracking number below to upload your receipt.",
+        })
+      }
+
       return NextResponse.json(
-        { error: 'Email already registered' },
+        { error: "This email is already registered. Sign in or use a different email." },
         { status: 400 }
       )
     }
@@ -243,24 +259,22 @@ export async function POST(request: NextRequest) {
         },
       })
 
-    try {
-      await sendRegistrationEmail({
-        email,
-        fullName: `${firstName} ${lastName}`.trim(),
-        trackingNumber,
-        membershipType,
-        paymentMethod,
-        wantsPhysicalId: Boolean(wantsPhysicalId),
-        physicalIdFee,
-        shippingFee,
-        totalDue: amountDue,
-        deliveryAddress: wantsPhysicalId
-          ? [deliveryRecipient, deliveryAddress, deliveryCity, deliveryProvince, deliveryZip].filter(Boolean).join(", ")
-          : "",
-      })
-    } catch (emailError) {
+    void sendRegistrationEmail({
+      email,
+      fullName: `${firstName} ${lastName}`.trim(),
+      trackingNumber,
+      membershipType,
+      paymentMethod,
+      wantsPhysicalId: Boolean(wantsPhysicalId),
+      physicalIdFee,
+      shippingFee,
+      totalDue: amountDue,
+      deliveryAddress: wantsPhysicalId
+        ? [deliveryRecipient, deliveryAddress, deliveryCity, deliveryProvince, deliveryZip].filter(Boolean).join(", ")
+        : "",
+    }).catch((emailError) => {
       console.error('Registration email error:', emailError)
-    }
+    })
 
     console.log('Registration successful for:', email)
     return NextResponse.json(

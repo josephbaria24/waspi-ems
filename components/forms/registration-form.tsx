@@ -44,6 +44,7 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
   const [isLoading, setIsLoading] = useState(false);
   const [registrationComplete, setRegistrationComplete] = useState(false);
   const [trackingNumber, setTrackingNumber] = useState("");
+  const [submitError, setSubmitError] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [errors, setErrors] = useState<Record<string, boolean>>({});
@@ -226,6 +227,7 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     setIsLoading(true);
+    setSubmitError("");
 
     try {
       const response = await fetch("/api/register", {
@@ -236,15 +238,17 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
         body: JSON.stringify(formData),
       });
 
-      const data = await response.json();
+      const data = await response.json().catch(() => ({}));
 
       if (!response.ok) {
+        const message = data.error || "Something went wrong. Please try again.";
+        setSubmitError(message);
         toast({
           title: "Registration Failed",
-          description: data.error || "Something went wrong. Please try again.",
+          description: message,
           variant: "destructive",
         });
-        return;
+        return false;
       }
 
       // Set success state
@@ -252,18 +256,21 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
       setRegistrationComplete(true);
 
       toast({
-        title: "Registration Successful",
-        description: `Your tracking number is ${data.trackingNumber}`,
+        title: data.alreadyRegistered ? "Already registered" : "Registration Successful",
+        description: data.message || `Your tracking number is ${data.trackingNumber}`,
       });
 
       onSuccess?.();
+      return true;
     } catch (error) {
       console.error("Registration error:", error);
+      setSubmitError("Failed to register. Please try again.");
       toast({
         title: "Error",
         description: "Failed to register. Please try again.",
         variant: "destructive",
       });
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -861,6 +868,12 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
                     Review the summary below. Nothing is submitted until you confirm.
                   </p>
                 </div>
+
+                {submitError && (
+                  <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {submitError}
+                  </div>
+                )}
 
                 <div className="rounded-2xl border border-[#E8EAEB] bg-white p-4 sm:p-5 space-y-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Applicant</p>
