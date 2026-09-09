@@ -19,6 +19,7 @@ interface StepperProps extends HTMLAttributes<HTMLDivElement> {
   backButtonText?: string;
   nextButtonText?: string;
   disableStepIndicators?: boolean;
+  stepLabels?: string[];
   renderStepIndicator?: (props: {
     step: number;
     currentStep: number;
@@ -44,6 +45,7 @@ export default function Stepper({
   backButtonText = 'Back',
   nextButtonText = 'Continue',
   disableStepIndicators = false,
+  stepLabels = [],
   renderStepIndicator,
   ...rest
 }: StepperProps) {
@@ -109,7 +111,7 @@ export default function Stepper({
         className={`mx-auto w-full ${stepCircleContainerClassName}`}
       >
         {/* Step Indicators Header */}
-        <div className={`${stepContainerClassName} flex w-full items-center border-b border-[#E8EAEB] bg-white px-5 py-4`}>
+        <div className={`${stepContainerClassName} flex w-full items-center border-b border-[#E8EAEB] bg-[#F7FBF8] px-5 py-4`}>
           {stepsArray.map((_, index) => {
             const stepNumber = index + 1;
             const isNotLastStep = index < totalSteps - 1;
@@ -131,6 +133,7 @@ export default function Stepper({
                 ) : (
                   <StepIndicator
                     step={stepNumber}
+                    label={stepLabels[index]}
                     disableStepIndicators={disableStepIndicators}
                     currentStep={currentStep}
                     onClickStep={async clicked => {
@@ -298,7 +301,7 @@ interface StepIndicatorProps {
   disableStepIndicators?: boolean;
 }
 
-function StepIndicator({ step, currentStep, onClickStep, disableStepIndicators = false }: StepIndicatorProps) {
+function StepIndicator({ step, label, currentStep, onClickStep, disableStepIndicators = false }: StepIndicatorProps & { label?: string }) {
   const status = currentStep === step ? 'active' : currentStep < step ? 'inactive' : 'complete';
 
   const handleClick = () => {
@@ -310,7 +313,7 @@ function StepIndicator({ step, currentStep, onClickStep, disableStepIndicators =
   return (
     <motion.div
       onClick={handleClick}
-      className={`relative outline-none focus:outline-none ${disableStepIndicators ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
+      className={`relative flex flex-col items-center gap-1.5 outline-none focus:outline-none ${disableStepIndicators ? 'pointer-events-none opacity-50' : 'cursor-pointer'}`}
       animate={status}
       initial={false}
     >
@@ -325,12 +328,15 @@ function StepIndicator({ step, currentStep, onClickStep, disableStepIndicators =
       >
         {status === 'complete' ? (
           <CheckIcon className="h-4 w-4 text-[#0B1F14]" />
-        ) : status === 'active' ? (
-          <div className="h-2.5 w-2.5 rounded-full bg-[#0B1F14]" />
         ) : (
           <span className="text-sm">{step}</span>
         )}
       </motion.div>
+      {label && (
+        <span className={`hidden text-[11px] font-semibold sm:block ${status === 'inactive' ? 'text-[#8D959D]' : 'text-[#0B1F14]'}`}>
+          {label}
+        </span>
+      )}
     </motion.div>
   );
 }
@@ -346,7 +352,7 @@ function StepConnector({ isComplete }: StepConnectorProps) {
   };
 
   return (
-    <div className="relative mx-2 h-0.5 flex-1 overflow-hidden rounded bg-gray-200">
+    <div className="relative mx-2 mb-5 h-0.5 flex-1 overflow-hidden rounded bg-[#E8EAEB]">
       <motion.div
         className="absolute left-0 top-0 h-full"
         variants={lineVariants}

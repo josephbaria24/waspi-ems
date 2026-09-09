@@ -3,11 +3,10 @@
 import { useEffect, useState } from "react"
 import type React from "react"
 import { Settings, LogOut, Bell, Search, QrCode, Users, FileUp, UserPlus, Ticket } from "lucide-react"
+import { usePathname, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase-client"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
-
-import { useRouter } from "next/navigation"
 
 type NotificationItem = {
   id: string
@@ -36,8 +35,11 @@ interface NavigationProps {
 }
 
 export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
-  const [active, setActive] = useState<"events" | "qr" | "settings" | "membership">("events")
+  const pathname = usePathname()
+  const [settingsActive, setSettingsActive] = useState(false)
   const router = useRouter()
+  const onQrPage = pathname.includes("/qr-scan")
+  const onMembership = pathname.startsWith("/membership")
 
   const handleComingSoon = () => {
     toast.info("🚧 This feature will be available soon!", { duration: 3000 })
@@ -49,7 +51,6 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
       return
     }
 
-    setActive("qr")
     if (onQRScanClick) {
       onQRScanClick()
     } else {
@@ -71,85 +72,78 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
 
   return (
     <>
-      {/* Top navigation bar */}
-      <nav className="border-b border-border bg-card">
-        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 relative">
-          {/* Left: Logo */}
-          <div className="flex items-center gap-2">
-            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-transparent">
-              <img src="/waspi-logo.png" alt="Logo" className="h-10 w-10 object-contain" />
-            </div>
+      <nav className="sticky top-0 z-40 border-b border-[#E8EAEB] bg-white/95 backdrop-blur">
+        <div className="relative flex items-center justify-between gap-3 px-4 py-3 sm:px-6">
+          <button
+            type="button"
+            onClick={() => router.push("/events")}
+            className="flex items-center gap-3 text-left"
+          >
+            <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-[#0B1F14]">
+              <img src="/waspi-logo.png" alt="WASPI" className="h-8 w-8 object-contain" />
+            </span>
+            <span className="hidden flex-col leading-tight sm:flex">
+              <span className="text-base font-semibold text-[#0B1F14]">WASPI</span>
+              <span className="text-xs text-[#8D959D]">Event Management</span>
+            </span>
+          </button>
 
-            <div className="hidden sm:flex flex-col leading-tight">
-              <span className="font-bold text-foreground text-lg">WASPI</span>
-              <span className="text-sm text-muted-foreground">Event Management System</span>
-            </div>
-          </div>
-
-          {/* Center Nav */}
-          <div className="absolute left-1/2 transform -translate-x-1/2 hidden sm:flex gap-1">
-
+          <div className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 rounded-full border border-[#E8EAEB] bg-[#F7FBF8] p-1 sm:flex">
             <NavIcon
               icon={QrCode}
               label="QR Scanner"
               onClick={handleQRScanner}
               disabled={!currentEventId}
-              active={active === "qr"}
+              active={onQrPage}
             />
             <NavIcon
               icon={Users}
               label="Membership"
-              onClick={() => {
-                setActive("membership")
-                router.push("/membership/admin")
-              }}
-              active={active === "membership"}
+              onClick={() => router.push("/membership/admin")}
+              active={onMembership}
             />
             <NavIcon
               icon={Settings}
               label="Settings"
               onClick={() => {
                 handleComingSoon()
-                setActive("settings")
+                setSettingsActive(true)
               }}
-              active={active === "settings"}
+              active={settingsActive}
             />
           </div>
 
-          {/* Right side actions */}
-          <div className="flex items-center gap-3 sm:gap-4">
-            {/* Search (md+) */}
+          <div className="flex items-center gap-2">
             <div className="relative hidden md:block">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8D959D]" />
               <input
                 type="text"
                 placeholder="Search..."
-                className="rounded-lg border border-input bg-background pl-9 pr-4 py-2 text-sm text-foreground placeholder-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-10 w-44 rounded-full border border-[#E8EAEB] bg-[#F7FBF8] pl-9 pr-4 text-sm text-[#1E1E1E] placeholder:text-[#8D959D] focus-visible:border-[#00D47E] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#00D47E]/20 lg:w-56"
               />
             </div>
 
             <NotificationBell />
 
-            {/* Logout */}
             <button
               onClick={handleLogout}
-              className="p-2 text-muted-foreground hover:text-destructive"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-[#8D959D] transition hover:bg-red-50 hover:text-red-600"
               title="Logout"
             >
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-4 w-4" />
             </button>
           </div>
         </div>
       </nav>
 
-      {/* 📱 Floating QR Scanner button */}
       <button
         onClick={handleQRScanner}
         disabled={!currentEventId}
-        className={`fixed bottom-5 left-1/2 -translate-x-1/2 z-50 flex items-center justify-center rounded-full p-4 shadow-lg transition-all sm:hidden ${currentEventId
-            ? "bg-primary text-primary-foreground hover:bg-primary/90"
-            : "bg-muted text-muted-foreground cursor-not-allowed"
-          }`}
+        className={`fixed bottom-5 left-1/2 z-50 flex -translate-x-1/2 items-center justify-center rounded-full p-4 shadow-lg transition-all sm:hidden ${
+          currentEventId
+            ? "bg-[#00D47E] text-[#0B1F14] hover:bg-[#00c174]"
+            : "cursor-not-allowed bg-[#E8EAEB] text-[#8D959D]"
+        }`}
         title="Open QR Scanner"
       >
         <QrCode className="h-6 w-6" />
@@ -216,7 +210,7 @@ function NotificationBell() {
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <button
-          className="relative rounded-full p-2 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          className="relative flex h-10 w-10 items-center justify-center rounded-full text-[#8D959D] transition-colors hover:bg-[#F7FBF8] hover:text-[#0B1F14]"
           aria-label="Notifications"
         >
           <Bell className="h-5 w-5" />
@@ -304,15 +298,16 @@ function NavIcon({
     <button
       onClick={onClick}
       disabled={disabled}
-      className={`flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${active
-          ? "bg-primary text-primary-foreground"
+      className={`flex items-center gap-2 rounded-full px-3.5 py-2 text-sm font-semibold transition-colors ${
+        active
+          ? "bg-[#00D47E] text-[#0B1F14]"
           : disabled
-            ? "text-muted-foreground/50 cursor-not-allowed"
-            : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-        }`}
+            ? "cursor-not-allowed text-[#8D959D]/50"
+            : "text-[#8D959D] hover:bg-white hover:text-[#0B1F14]"
+      }`}
     >
       <Icon className="h-4 w-4" />
-      <span className="hidden sm:inline">{label}</span>
+      <span>{label}</span>
     </button>
   )
 }

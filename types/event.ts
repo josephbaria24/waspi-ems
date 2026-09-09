@@ -6,6 +6,7 @@ export type Event = {
   type: string
   price: number
   venue: string
+  feature_image?: string
   schedule: DaySchedule[]
   attendees: number // This can be a single number for backwards compatibility
   createdAt: string

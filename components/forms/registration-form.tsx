@@ -1,7 +1,7 @@
 //components\forms\registration-form.tsx
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ComponentType } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -9,18 +9,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MembershipCard3D } from "@/components/ui/membership-card-3d";
 import { useToast } from "@/hooks/use-toast";
 import Stepper, { Step } from "@/components/Stepper";
-import { Eye, EyeOff, CheckCircle2, Copy, ExternalLink } from "lucide-react";
+import { Eye, EyeOff, CheckCircle2, Copy, ExternalLink, User, BadgeCheck, Wallet, ClipboardCheck, MapPin, CreditCard, Building2, Banknote } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
@@ -31,8 +23,32 @@ import {
 } from "@/lib/membership-settings";
 
 const fieldClass =
-  "h-9 rounded-xl border-[#E8EAEB] bg-white text-sm shadow-none focus-visible:border-[#00D47E] focus-visible:ring-[#00D47E]/20";
-const labelClass = "text-xs font-medium text-[#1E1E1E]";
+  "h-11 rounded-xl border-[#E8EAEB] bg-white text-sm text-[#1E1E1E] shadow-none focus-visible:border-[#00D47E] focus-visible:ring-[#00D47E]/20";
+const labelClass = "text-xs font-semibold uppercase tracking-wide text-[#8D959D]";
+
+function StepHeading({
+  icon: Icon,
+  title,
+  description,
+  tint,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  title: string;
+  description: string;
+  tint: string;
+}) {
+  return (
+    <div className="mb-1 flex items-start gap-3">
+      <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${tint}`}>
+        <Icon className="h-5 w-5" />
+      </span>
+      <div>
+        <p className="text-base font-semibold text-[#1E1E1E]">{title}</p>
+        <p className="text-sm text-[#8D959D]">{description}</p>
+      </div>
+    </div>
+  );
+}
 
 interface RegistrationFormProps {
   onSuccess?: () => void;
@@ -61,6 +77,7 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
     address: "",
     city: "",
     zipCode: "",
+    organization: "",
     paymentMethod: "",
     cardNumber: "",
     cardExpiry: "",
@@ -279,11 +296,11 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
   // ==================== SUCCESS SCREEN ====================
   if (registrationComplete) {
     return (
-      <Card className="rounded-[28px] border border-[#E8EAEB] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
+      <Card className="overflow-hidden rounded-[28px] border border-[#E8EAEB] bg-white shadow-[0_8px_28px_rgba(15,23,42,0.06)]">
         <CardContent className="space-y-6 py-10 text-center">
           <div className="flex justify-center">
-            <div className="rounded-full bg-primary/10 p-4">
-              <CheckCircle2 className="h-16 w-16 text-primary" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-[#00D47E] text-[#0B1F14]">
+              <CheckCircle2 className="h-8 w-8" />
             </div>
           </div>
 
@@ -395,6 +412,7 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
             onFinalStepCompleted={() => handleSubmit()}
             backButtonText="Previous"
             nextButtonText="Next Step"
+            stepLabels={["Personal", "Membership", "Payment", "Confirm"]}
             nextButtonProps={{ disabled: isLoading }}
             backButtonProps={{ disabled: isLoading }}
             stepContainerClassName="!px-0"
@@ -404,6 +422,12 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
             {/* Step 1: Personal Information */}
             <Step>
               <div className="space-y-4">
+                <StepHeading
+                  icon={User}
+                  title="Personal details"
+                  description="Tell us who is registering."
+                  tint="bg-emerald-50 text-emerald-700"
+                />
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1.5">
                     <Label htmlFor="firstName" className={labelClass}>
@@ -536,8 +560,25 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
                   </div>
                 </div>
 
-                <div className="space-y-3 border-t border-[#E8EAEB] pt-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8D959D]">Address</p>
+                <div className="space-y-1.5">
+                  <Label htmlFor="organization" className={labelClass}>
+                    Organization <span className="normal-case tracking-normal text-[#8D959D]">(optional)</span>
+                  </Label>
+                  <Input
+                    id="organization"
+                    name="organization"
+                    placeholder="Company, school, or organization"
+                    value={formData.organization}
+                    onChange={handleInputChange}
+                    className={fieldClass}
+                  />
+                </div>
+
+                <div className="space-y-3 rounded-2xl border border-[#E8EAEB] bg-[#F7FBF8] p-4">
+                  <p className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
+                    <MapPin className="h-3.5 w-3.5 text-[#017C7C]" />
+                    Address
+                  </p>
                   <div className="space-y-1.5">
                     <Label htmlFor="address" className={labelClass}>
                       Street address
@@ -590,13 +631,13 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
             {/* Step 2: Membership Selection */}
             <Step>
               <div className="space-y-5">
-                <div className="space-y-2 text-center">
-                  <Label className="text-base font-semibold text-[#1E1E1E]">
-                    Select membership
-                  </Label>
-                  <p className="text-sm text-[#8D959D]">
-                    Choose the plan that best fits your profile
-                  </p>
+                <div className="space-y-2">
+                  <StepHeading
+                    icon={BadgeCheck}
+                    title="Select membership"
+                    description="Choose the plan that best fits your profile."
+                    tint="bg-sky-50 text-sky-700"
+                  />
                   <div className="mt-4 grid grid-cols-1 items-start justify-items-stretch gap-3 sm:mt-6 sm:grid-cols-2 sm:gap-4 lg:grid-cols-3">
                     {membershipSettings.plans.map((type) => (
                       <MembershipCard3D
@@ -613,14 +654,17 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
                   </div>
                 </div>
 
-                <div className="rounded-2xl border border-[#E8EAEB] bg-[#F7FBF8] p-4">
-                  <p className="text-sm font-bold text-emerald-800 mb-4 uppercase tracking-wider">
-                    {selectedPlan.name} Benefits:
+                <div className="rounded-2xl border border-[#E8EAEB] bg-white p-4">
+                  <p className="mb-3 flex items-center gap-2 text-sm font-semibold text-[#1E1E1E]">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#00D47E]/15 text-[#0B1F14]">
+                      <BadgeCheck className="h-4 w-4" />
+                    </span>
+                    {selectedPlan.name} benefits
                   </p>
-                  <ul className="text-sm text-emerald-700/80 space-y-3 list-none">
+                  <ul className="space-y-2 text-sm text-[#1E1E1E]">
                     {selectedPlan.benefits.map((benefit) => (
                       <li key={benefit} className="flex items-center gap-2">
-                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                        <CheckCircle2 className="h-4 w-4 shrink-0 text-[#00D47E]" />
                         {benefit}
                       </li>
                     ))}
@@ -633,31 +677,43 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
             <Step>
               <div className="space-y-4">
                 <div className="space-y-4">
-                  <div className="w-full max-w-xs space-y-1.5">
-                    <Label
-                      htmlFor="paymentMethod"
-                      className={labelClass}
-                    >
-                      Payment method
-                    </Label>
-                    <Select
-                      value={formData.paymentMethod}
-                      onValueChange={(value) =>
-                        handleSelectChange("paymentMethod", value)
-                      }
-                    >
-                      <SelectTrigger className={cn(
-                        "h-9 rounded-xl border-[#E8EAEB] text-sm shadow-none",
-                        errors.paymentMethod && "border-red-500"
-                      )}>
-                        <SelectValue placeholder="Select payment method" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="cash">Cash (In-person)</SelectItem>
-                        <SelectItem value="ewallet">E-wallets (GCash/Maya)</SelectItem>
-                        <SelectItem value="bank">Bank Transfer</SelectItem>
-                      </SelectContent>
-                    </Select>
+                  <StepHeading
+                    icon={Wallet}
+                    title="Payment"
+                    description="Choose how you will pay and review the total."
+                    tint="bg-amber-50 text-amber-700"
+                  />
+                  <div className="space-y-2">
+                    <Label className={labelClass}>Payment method</Label>
+                    <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                      {[
+                        { value: "bank", label: "Bank Transfer", icon: Building2 },
+                        { value: "ewallet", label: "GCash / Maya", icon: CreditCard },
+                        { value: "cash", label: "Cash", icon: Banknote },
+                      ].map((method) => {
+                        const Icon = method.icon
+                        const selected = formData.paymentMethod === method.value
+                        return (
+                          <button
+                            key={method.value}
+                            type="button"
+                            onClick={() => handleSelectChange("paymentMethod", method.value)}
+                            className={cn(
+                              "flex items-center gap-2 rounded-2xl border px-3 py-3 text-left text-sm font-semibold transition",
+                              selected
+                                ? "border-[#00D47E] bg-[#00D47E]/10 text-[#0B1F14]"
+                                : "border-[#E8EAEB] bg-white text-[#1E1E1E] hover:border-[#00D47E]/50",
+                              errors.paymentMethod && !formData.paymentMethod && "border-red-500"
+                            )}
+                          >
+                            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${selected ? "bg-[#00D47E] text-[#0B1F14]" : "bg-[#F7FBF8] text-[#017C7C]"}`}>
+                              <Icon className="h-4 w-4" />
+                            </span>
+                            {method.label}
+                          </button>
+                        )
+                      })}
+                    </div>
                   </div>
 
                   <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
@@ -860,14 +916,12 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
 
             <Step>
               <div className="space-y-4">
-                <div className="space-y-1 text-center">
-                  <Label className="text-base font-semibold text-[#1E1E1E]">
-                    Confirm your registration
-                  </Label>
-                  <p className="text-sm text-[#8D959D]">
-                    Review the summary below. Nothing is submitted until you confirm.
-                  </p>
-                </div>
+                <StepHeading
+                  icon={ClipboardCheck}
+                  title="Confirm your registration"
+                  description="Review the summary. Nothing is submitted until you confirm."
+                  tint="bg-violet-50 text-violet-700"
+                />
 
                 {submitError && (
                   <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -889,6 +943,12 @@ export function RegistrationForm({ onSuccess }: RegistrationFormProps) {
                     <span className="text-gray-500">Phone</span>
                     <span className="font-medium text-[#1E1E1E] text-right">{formData.phone}</span>
                   </div>
+                  {formData.organization && (
+                    <div className="flex justify-between gap-4 text-sm">
+                      <span className="text-gray-500">Organization</span>
+                      <span className="font-medium text-[#1E1E1E] text-right">{formData.organization}</span>
+                    </div>
+                  )}
                   <div className="flex justify-between gap-4 text-sm">
                     <span className="text-gray-500">Address</span>
                     <span className="font-medium text-[#1E1E1E] text-right">

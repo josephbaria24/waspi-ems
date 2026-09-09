@@ -569,13 +569,13 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
 
   return (
     <>
-      <Card>
+      <Card className="rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
         <CardHeader>
           <div className="space-y-4">
             <div>
-              <CardTitle>Attendance Details</CardTitle>
-              <CardDescription className="mt-2">
-                Showing: {filteredAttendees.length} Results
+              <CardTitle className="text-[#1E1E1E]">Attendance Details</CardTitle>
+              <CardDescription className="mt-1 text-[#8D959D]">
+                Showing {filteredAttendees.length} results
               </CardDescription>
             </div>
 

@@ -3,7 +3,6 @@
 import { useState, useEffect } from "react"
 import { Plus, CalendarDays, Clock4, Users, CheckCircle2, CreditCard } from "lucide-react"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent } from "@/components/ui/card"
 import { EventModal } from "@/components/event-modal"
 import { EventCard } from "@/components/event-card"
 import type { Event } from "@/types/event"
@@ -138,12 +137,13 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
           type: event.type,
           price: Number(event.price),
           venue: event.venue,
+          feature_image: event.feature_image,
           schedule:
             event.schedules?.map((s: any) => ({
-              day: s.day,
-              inTime: s.timeIn,
-              outTime: s.timeOut,
-              coveredTopics: event.topics ?? [],
+              date: s.date || s.day || "",
+              timeIn: s.timeIn || s.inTime || "",
+              timeOut: s.timeOut || s.outTime || "",
+              coveredTopics: s.coveredTopics ?? event.topics ?? [],
             })) ?? [],
           attendees: stats,
           createdAt: event.created_at,
@@ -201,13 +201,54 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
     ? Math.round((totalStats.attended / totalStats.registered) * 100)
     : 0
 
+  const paymentRate = totalStats.registered > 0
+    ? Math.round((totalStats.paid / totalStats.registered) * 100)
+    : 0
+
+  const statCards = [
+    {
+      label: "Total Events",
+      value: events.length,
+      hint: `${upcomingEvents.length} upcoming · ${pastEvents.length} past`,
+      icon: CalendarDays,
+      tint: "bg-emerald-50 text-emerald-700",
+      bar: "bg-[#00D47E]",
+    },
+    {
+      label: "Registered",
+      value: totalStats.registered.toLocaleString(),
+      hint: "Total attendees",
+      icon: Users,
+      tint: "bg-sky-50 text-sky-700",
+      bar: "bg-sky-500",
+    },
+    {
+      label: "Attended",
+      value: totalStats.attended.toLocaleString(),
+      hint: `${attendanceRate}% attendance rate`,
+      icon: CheckCircle2,
+      tint: "bg-[#00D47E]/15 text-[#0B1F14]",
+      bar: "bg-[#00D47E]",
+      progress: attendanceRate,
+    },
+    {
+      label: "Fully Paid",
+      value: totalStats.paid.toLocaleString(),
+      hint: `${paymentRate}% payment rate`,
+      icon: CreditCard,
+      tint: "bg-amber-50 text-amber-700",
+      bar: "bg-amber-500",
+      progress: paymentRate,
+    },
+  ]
+
   if (isLoading) {
     return (
-      <main className="p-4 sm:p-6">
-        <div className="flex items-center justify-center h-64">
+      <main className="min-h-[calc(100vh-4rem)] bg-[#F7FBF8] p-4 sm:p-6">
+        <div className="flex h-64 items-center justify-center">
           <div className="text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-            <p className="text-muted-foreground">Loading events and attendees...</p>
+            <div className="mx-auto mb-4 h-12 w-12 animate-spin rounded-full border-2 border-[#E8EAEB] border-b-[#00D47E]" />
+            <p className="text-sm text-[#8D959D]">Loading events and attendees...</p>
           </div>
         </div>
       </main>
@@ -215,154 +256,124 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
   }
 
   return (
-    <main className="p-4 sm:p-6">
-      <div className="space-y-4 sm:space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between gap-3">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Events</h1>
-            <p className="text-sm sm:text-base text-muted-foreground hidden sm:block">Manage your events and attendees</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <Button
-              onClick={() => window.location.href = "/membership/admin"}
-              variant="outline"
-              size="sm"
-              className="border-primary/30"
-            >
-              <Users className="mr-1 h-4 w-4" />
-              <span className="hidden sm:inline">Members</span>
-            </Button>
-            <Button
-              onClick={() => setIsModalOpen(true)}
-              className="bg-primary text-primary-foreground hover:bg-accent"
-              size="sm"
-            >
-              <Plus className="mr-1 h-4 w-4" />
-              <span className="hidden sm:inline">Create Event</span>
-              <span className="sm:hidden">Create</span>
-            </Button>
+    <main className="min-h-[calc(100vh-4rem)] bg-[#F7FBF8] p-4 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="relative overflow-hidden rounded-3xl bg-[#0B1F14] px-5 py-6 text-white sm:px-7 sm:py-7">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#00D47E]/25" />
+          <div className="pointer-events-none absolute -bottom-16 left-1/3 h-32 w-40 rounded-full bg-[#017C7C]/40" />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-start gap-3">
+              <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00D47E] text-[#0B1F14]">
+                <CalendarDays className="h-6 w-6" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-semibold sm:text-3xl">Events</h1>
+                <p className="mt-1 text-sm text-white/70">Manage your events and attendees</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                onClick={() => { window.location.href = "/membership/admin" }}
+                variant="outline"
+                className="h-10 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+              >
+                <Users className="h-4 w-4" />
+                Members
+              </Button>
+              <Button
+                onClick={() => setIsModalOpen(true)}
+                className="h-10 rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]"
+              >
+                <Plus className="h-4 w-4" />
+                Create Event
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Stats Overview Cards */}
         {events.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
-            {/* Total Events */}
-            <Card className="border-l-4 border-l-primary">
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Total Events</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">{events.length}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      {upcomingEvents.length} upcoming • {pastEvents.length} past
-                    </p>
+          <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {statCards.map((stat) => {
+              const Icon = stat.icon
+              return (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-[#E8EAEB] bg-white p-4 shadow-sm"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-semibold uppercase tracking-wide text-[#8D959D]">{stat.label}</p>
+                      <p className="mt-1 text-2xl font-semibold text-[#1E1E1E] sm:text-3xl">{stat.value}</p>
+                    </div>
+                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.tint}`}>
+                      <Icon className="h-5 w-5" />
+                    </span>
                   </div>
-                  <CalendarDays className="h-8 w-8 sm:h-10 sm:w-10 text-primary opacity-20" />
+                  <p className="mt-3 text-xs text-[#8D959D]">{stat.hint}</p>
+                  {typeof stat.progress === "number" && (
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E8EAEB]">
+                      <div className={`h-full rounded-full ${stat.bar}`} style={{ width: `${stat.progress}%` }} />
+                    </div>
+                  )}
                 </div>
-              </CardContent>
-            </Card>
-
-            {/* Registered Attendees */}
-            <Card className="border-l-4 border-l-blue-500">
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Registered</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">{totalStats.registered}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">Total attendees</p>
-                  </div>
-                  <Users className="h-8 w-8 sm:h-10 sm:w-10 text-blue-500 opacity-20" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Attended */}
-            <Card className="border-l-4 border-l-green-600">
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Attended</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">{totalStats.attended}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      {attendanceRate}% attendance rate
-                    </p>
-                  </div>
-                  <CheckCircle2 className="h-8 w-8 sm:h-10 sm:w-10 text-green-600 opacity-20" />
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Fully Paid */}
-            <Card className="border-l-4 border-l-amber-600">
-              <CardContent className="pt-4 pb-3">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs font-medium text-muted-foreground">Fully Paid</p>
-                    <p className="text-2xl sm:text-3xl font-bold text-foreground mt-1">{totalStats.paid}</p>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground mt-0.5">
-                      {totalStats.registered > 0
-                        ? Math.round((totalStats.paid / totalStats.registered) * 100)
-                        : 0}% payment rate
-                    </p>
-                  </div>
-                  <CreditCard className="h-8 w-8 sm:h-10 sm:w-10 text-amber-600 opacity-20" />
-                </div>
-              </CardContent>
-            </Card>
+              )
+            })}
           </div>
         )}
 
-        {/* Upcoming Events */}
         {upcomingEvents.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 mt-6 sm:mt-8">
-              <CalendarDays className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Upcoming Events</h2>
-              <span className="ml-1 sm:ml-2 rounded-full bg-green-100 dark:bg-green-900/30 px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-medium text-green-700 dark:text-green-400">
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                <CalendarDays className="h-4 w-4" />
+              </span>
+              <h2 className="text-lg font-semibold text-[#1E1E1E] sm:text-xl">Upcoming Events</h2>
+              <span className="rounded-full bg-[#00D47E]/15 px-2.5 py-0.5 text-xs font-semibold text-[#0B1F14]">
                 {upcomingEvents.length}
               </span>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {upcomingEvents.map((event) => (
                 <EventCard key={event.id} event={event} onSelect={() => onSelectEvent(event.id)} />
               ))}
             </div>
-          </>
+          </section>
         )}
 
-        {/* Past Events */}
         {pastEvents.length > 0 && (
-          <>
-            <div className="flex items-center gap-2 mt-8 sm:mt-10">
-              <Clock4 className="h-5 w-5 sm:h-6 sm:w-6 text-muted-foreground" />
-              <h2 className="text-xl sm:text-2xl font-semibold text-foreground">Past Events</h2>
-              <span className="ml-1 sm:ml-2 rounded-full bg-gray-100 dark:bg-gray-800 px-2 sm:px-3 py-0.5 sm:py-1 text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-400">
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E8EAEB] text-[#8D959D]">
+                <Clock4 className="h-4 w-4" />
+              </span>
+              <h2 className="text-lg font-semibold text-[#1E1E1E] sm:text-xl">Past Events</h2>
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-[#8D959D] ring-1 ring-[#E8EAEB]">
                 {pastEvents.length}
               </span>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {pastEvents.map((event) => (
                 <EventCard key={event.id} event={event} onSelect={() => onSelectEvent(event.id)} />
               ))}
             </div>
-          </>
+          </section>
         )}
 
-        {/* No Events Fallback */}
         {events.length === 0 && (
-          <Card>
-            <CardContent className="flex flex-col items-center justify-center py-12">
-              <CalendarDays className="h-16 w-16 text-muted-foreground mb-4 opacity-20" />
-              <p className="text-lg font-medium text-foreground mb-2">No events yet</p>
-              <p className="text-muted-foreground mb-4">Create your first event to get started</p>
-              <Button onClick={() => setIsModalOpen(true)} variant="outline">
-                <Plus className="mr-2 h-4 w-4" />
-                Create your first event
-              </Button>
-            </CardContent>
-          </Card>
+          <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-[#CDEEDD] bg-white px-6 py-16 text-center">
+            <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00D47E]/15 text-[#0B1F14]">
+              <CalendarDays className="h-7 w-7" />
+            </span>
+            <p className="text-lg font-semibold text-[#1E1E1E]">No events yet</p>
+            <p className="mt-1 text-sm text-[#8D959D]">Create your first event to get started</p>
+            <Button
+              onClick={() => setIsModalOpen(true)}
+              className="mt-5 h-10 rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]"
+            >
+              <Plus className="h-4 w-4" />
+              Create your first event
+            </Button>
+          </div>
         )}
       </div>
 

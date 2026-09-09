@@ -21,6 +21,7 @@ export async function POST(request: NextRequest) {
       city,
       state,
       zipCode,
+      organization,
       paymentMethod,
       cardNumber,
       cardExpiry,
@@ -131,6 +132,7 @@ export async function POST(request: NextRequest) {
         address,
         city,
         zip_code: zipCode,
+        company: organization?.trim() || null,
         // Remove state and membership_type from profiles as they aren't in your schema
       })
 

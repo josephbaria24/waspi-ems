@@ -2,7 +2,7 @@
 "use client"
 
 import { useState } from "react"
-import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard } from "lucide-react"
+import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -69,20 +69,23 @@ export function EventDetailsCard({ event, onAttendeeAdded }: { event: EventWithS
     { label: "Upload Attendees", icon: Upload },
   ]
 
+  const fieldClass =
+    "w-full rounded-xl border border-[#E8EAEB] bg-white px-3 py-2.5 text-sm text-[#1E1E1E] outline-none focus-visible:border-[#00D47E] focus-visible:ring-2 focus-visible:ring-[#00D47E]/20"
+
   return (
-    <Card>
+    <Card className="rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
       <CardHeader className="flex flex-row items-start justify-between space-y-0">
         <div>
-          <CardTitle>Event Details</CardTitle>
-          <CardDescription>Manage event information</CardDescription>
+          <CardTitle className="text-[#1E1E1E]">Event Details</CardTitle>
+          <CardDescription className="text-[#8D959D]">Manage event information</CardDescription>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => setIsEditing(!isEditing)} className="rounded-lg">
+          <Button variant="outline" size="icon" onClick={() => setIsEditing(!isEditing)} className="rounded-full border-[#E8EAEB]">
             <Edit2 className="h-4 w-4" />
           </Button>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-lg bg-transparent">
+              <Button variant="outline" size="icon" className="rounded-full border-[#E8EAEB] bg-transparent">
                 <MoreVertical className="h-4 w-4" />
               </Button>
             </DropdownMenuTrigger>
@@ -136,172 +139,208 @@ export function EventDetailsCard({ event, onAttendeeAdded }: { event: EventWithS
           {isEditing ? (
             <div className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Event Name</label>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Event Name</label>
                 <input
                   type="text"
                   value={editedEvent.name}
                   onChange={(e) => setEditedEvent({ ...editedEvent, name: e.target.value })}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={fieldClass}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Description</label>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Description</label>
                 <Textarea
                   value={editedEvent.description || ""}
                   onChange={(e) => setEditedEvent({ ...editedEvent, description: e.target.value })}
                   placeholder="Enter event description..."
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring min-h-[100px]"
+                  className={`${fieldClass} min-h-[100px]`}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Venue</label>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Venue</label>
                 <input
                   type="text"
                   value={editedEvent.venue}
                   onChange={(e) => setEditedEvent({ ...editedEvent, venue: e.target.value })}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className={fieldClass}
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-foreground mb-2">Price</label>
-                <input
-                  type="number"
-                  value={editedEvent.price}
-                  onChange={(e) => setEditedEvent({ ...editedEvent, price: Number.parseFloat(e.target.value) || 0 })}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Price</label>
+                <div className="relative">
+                  <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-semibold text-[#017C7C]">₱</span>
+                  <input
+                    type="number"
+                    value={editedEvent.price}
+                    onChange={(e) => setEditedEvent({ ...editedEvent, price: Number.parseFloat(e.target.value) || 0 })}
+                    className={`${fieldClass} pl-8`}
+                  />
+                </div>
               </div>
 
-              <div className="flex gap-3 pt-4">
+              <div className="flex gap-3 pt-2">
                 <Button
                   variant="outline"
                   onClick={() => {
                     setEditedEvent(event)
                     setIsEditing(false)
                   }}
-                  className="flex-1"
+                  className="h-11 flex-1 rounded-full border-[#E8EAEB]"
                 >
                   Cancel
                 </Button>
-                <Button onClick={handleSave} className="flex-1 bg-primary text-primary-foreground hover:bg-accent">
+                <Button onClick={handleSave} className="h-11 flex-1 rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]">
                   Save Changes
                 </Button>
               </div>
             </div>
           ) : (
             <div className="space-y-4">
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Event Name</p>
-                <p className="text-lg font-semibold text-foreground">{editedEvent.name}</p>
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl bg-sky-50 px-3 py-3 text-center">
+                  <Users className="mx-auto mb-1 h-4 w-4 text-sky-700" />
+                  <p className="text-xl font-semibold text-[#1E1E1E]">{event.attendees.registered}</p>
+                  <p className="text-[11px] text-sky-700">Registered</p>
+                </div>
+                <div className="rounded-xl bg-emerald-50 px-3 py-3 text-center">
+                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-700" />
+                  <p className="text-xl font-semibold text-[#1E1E1E]">{event.attendees.attended}</p>
+                  <p className="text-[11px] text-emerald-700">Attended</p>
+                </div>
+                <div className="rounded-xl bg-amber-50 px-3 py-3 text-center">
+                  <CreditCard className="mx-auto mb-1 h-4 w-4 text-amber-700" />
+                  <p className="text-xl font-semibold text-[#1E1E1E]">{event.attendees.paid}</p>
+                  <p className="text-[11px] text-amber-700">Paid</p>
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="rounded-2xl border border-[#E8EAEB] bg-[#F7FBF8] p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Type</p>
+                  <p className="mt-1 font-semibold text-[#1E1E1E]">{editedEvent.type}</p>
+                </div>
+                <div className="rounded-2xl border border-[#E8EAEB] bg-[#F7FBF8] p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Price</p>
+                  <p className="mt-1 font-semibold text-[#017C7C]">₱{editedEvent.price.toLocaleString()}</p>
+                </div>
+              </div>
+
+              <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">
+                  <MapPin className="h-3.5 w-3.5 text-[#017C7C]" />
+                  Venue
+                </p>
+                <p className="mt-1 font-semibold text-[#1E1E1E]">{editedEvent.venue}</p>
               </div>
 
               {editedEvent.description && (
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Description</p>
-                  <p className="text-foreground whitespace-pre-wrap">{editedEvent.description}</p>
+                <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Description</p>
+                  <p className="mt-1 whitespace-pre-wrap text-sm text-[#1E1E1E]">{editedEvent.description}</p>
                 </div>
               )}
 
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Type</p>
-                  <p className="font-semibold text-foreground">{editedEvent.type}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Price</p>
-                  <p className="font-semibold text-foreground">₱{editedEvent.price.toLocaleString()}</p>
-                </div>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-muted-foreground">Venue</p>
-                <p className="font-semibold text-foreground">{editedEvent.venue}</p>
-              </div>
-
               {editedEvent.schedule && editedEvent.schedule.length > 0 ? (
-                <div className="space-y-4 border-t border-border pt-4">
-                  <p className="text-sm font-medium text-muted-foreground">Schedule</p>
+                <div className="space-y-3 rounded-2xl border border-[#E8EAEB] bg-white p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="flex items-center gap-2 text-sm font-semibold text-[#1E1E1E]">
+                      <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
+                        <CalendarDays className="h-4 w-4" />
+                      </span>
+                      Schedule
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        setEditedEvent({
+                          ...editedEvent,
+                          schedule: [
+                            ...editedEvent.schedule,
+                            {
+                              date: "",
+                              timeIn: "",
+                              timeOut: "",
+                              coveredTopics: [],
+                            },
+                          ],
+                        })
+                      }
+                      className="h-8 rounded-full border-[#E8EAEB] text-xs"
+                    >
+                      <Plus className="h-3.5 w-3.5" />
+                      Add day
+                    </Button>
+                  </div>
                   {editedEvent.schedule.map((sched, index) => (
-                    <div key={index} className="grid grid-cols-3 gap-4 items-end">
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Date</label>
-                        <input
-                          type="date"
-                          value={sched.date}
-                          onChange={(e) => {
-                            const updated = [...editedEvent.schedule]
-                            updated[index].date = e.target.value
-                            setEditedEvent({ ...editedEvent, schedule: updated })
-                          }}
-                          className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Time-In</label>
-                        <input
-                          type="time"
-                          value={sched.timeIn}
-                          onChange={(e) => {
-                            const updated = [...editedEvent.schedule]
-                            updated[index].timeIn = e.target.value
-                            setEditedEvent({ ...editedEvent, schedule: updated })
-                          }}
-                          className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-xs text-muted-foreground mb-1">Time-Out</label>
-                        <input
-                          type="time"
-                          value={sched.timeOut}
-                          onChange={(e) => {
-                            const updated = [...editedEvent.schedule]
-                            updated[index].timeOut = e.target.value
-                            setEditedEvent({ ...editedEvent, schedule: updated })
-                          }}
-                          className="w-full rounded border border-input bg-background px-2 py-1 text-sm"
-                        />
+                    <div key={index} className="rounded-2xl bg-[#F7FBF8] p-3">
+                      <p className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Day {index + 1}</p>
+                      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+                        <div>
+                          <label className="mb-1 flex items-center gap-1 text-xs text-[#8D959D]">
+                            <CalendarDays className="h-3 w-3" /> Date
+                          </label>
+                          <input
+                            type="date"
+                            value={sched.date}
+                            onChange={(e) => {
+                              const updated = [...editedEvent.schedule]
+                              updated[index].date = e.target.value
+                              setEditedEvent({ ...editedEvent, schedule: updated })
+                            }}
+                            className={fieldClass}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 flex items-center gap-1 text-xs text-[#8D959D]">
+                            <Clock className="h-3 w-3" /> Start
+                          </label>
+                          <input
+                            type="time"
+                            value={sched.timeIn}
+                            onChange={(e) => {
+                              const updated = [...editedEvent.schedule]
+                              updated[index].timeIn = e.target.value
+                              setEditedEvent({ ...editedEvent, schedule: updated })
+                            }}
+                            className={fieldClass}
+                          />
+                        </div>
+                        <div>
+                          <label className="mb-1 flex items-center gap-1 text-xs text-[#8D959D]">
+                            <Clock className="h-3 w-3" /> End
+                          </label>
+                          <input
+                            type="time"
+                            value={sched.timeOut}
+                            onChange={(e) => {
+                              const updated = [...editedEvent.schedule]
+                              updated[index].timeOut = e.target.value
+                              setEditedEvent({ ...editedEvent, schedule: updated })
+                            }}
+                            className={fieldClass}
+                          />
+                        </div>
                       </div>
                     </div>
                   ))}
-
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setEditedEvent({
-                        ...editedEvent,
-                        schedule: [
-                          ...editedEvent.schedule,
-                          {
-                            date: "",
-                            timeIn: "",
-                            timeOut: "",
-                            coveredTopics: [],
-                          },
-                        ],
-                      })
-                    }
-                  >
-                    + Add Another Day
-                  </Button>
                 </div>
               ) : (
-                <div className="pt-4 border-t border-border">
-                  <p className="text-sm text-muted-foreground">No schedule available</p>
+                <div className="rounded-2xl border border-dashed border-[#CDEEDD] bg-[#F7FBF8] px-4 py-4">
+                  <p className="text-sm text-[#8D959D]">No schedule available</p>
                 </div>
               )}
 
-              <div className="space-y-2 border-t border-border pt-4">
-                <label className="text-sm font-medium text-muted-foreground">Covered Topics</label>
+              <div className="space-y-2 rounded-2xl border border-[#E8EAEB] bg-white p-3">
+                <label className="text-sm font-semibold text-[#1E1E1E]">Covered Topics</label>
                 <div className="flex gap-2">
                   <input
                     type="text"
                     placeholder="Add a topic"
-                    className="flex-1 rounded border border-input px-2 py-1 text-sm"
+                    className={fieldClass}
                     value={topicInput}
                     onChange={(e) => setTopicInput(e.target.value)}
                     onKeyDown={(e) => {
@@ -318,6 +357,7 @@ export function EventDetailsCard({ event, onAttendeeAdded }: { event: EventWithS
                   <Button
                     size="sm"
                     type="button"
+                    className="h-10 rounded-xl bg-[#0B1F14] text-white hover:bg-[#0B1F14]/90"
                     onClick={() => {
                       if (editedEvent.schedule.length === 0) return
                       const newSchedule = [...editedEvent.schedule]
@@ -336,7 +376,7 @@ export function EventDetailsCard({ event, onAttendeeAdded }: { event: EventWithS
                       {editedEvent.schedule[0].coveredTopics.map((topic, index) => (
                         <div
                           key={index}
-                          className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-3 py-1 text-sm text-primary"
+                          className="inline-flex items-center gap-1 rounded-full bg-[#00D47E]/15 px-3 py-1 text-sm font-medium text-[#0B1F14]"
                         >
                           {topic}
                           <button
@@ -356,27 +396,6 @@ export function EventDetailsCard({ event, onAttendeeAdded }: { event: EventWithS
                 </div>
               </div>
 
-              {/* 📊 Attendee Stats Section */}
-              <div className="pt-4 border-t border-border">
-                <p className="text-sm font-medium text-muted-foreground mb-3">Attendee Statistics</p>
-                <div className="grid grid-cols-3 gap-4 text-center">
-                  <div className="p-3 rounded-lg bg-blue-50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-800">
-                    <Users className="h-5 w-5 mx-auto text-blue-500 mb-2" />
-                    <p className="text-2xl font-bold text-foreground">{event.attendees.registered}</p>
-                    <p className="text-xs text-muted-foreground">Registered</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-                    <CheckCircle2 className="h-5 w-5 mx-auto text-green-600 mb-2" />
-                    <p className="text-2xl font-bold text-foreground">{event.attendees.attended}</p>
-                    <p className="text-xs text-muted-foreground">Attended</p>
-                  </div>
-                  <div className="p-3 rounded-lg bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
-                    <CreditCard className="h-5 w-5 mx-auto text-amber-600 mb-2" />
-                    <p className="text-2xl font-bold text-foreground">{event.attendees.paid}</p>
-                    <p className="text-xs text-muted-foreground">Paid</p>
-                  </div>
-                </div>
-              </div>
             </div>
           )}
         </div>

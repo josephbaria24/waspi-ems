@@ -1,6 +1,6 @@
 //components\event-details.tsx
 "use client"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, MapPin } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { EventDetailsCard } from "@/components/event-details-card"
@@ -92,6 +92,7 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: ()
         type: data.type,
         price: Number(data.price),
         venue: data.venue,
+        feature_image: data.feature_image,
         schedule: data.schedules ?? [],
         attendees: stats, // Now using stats object instead of single number
         createdAt: data.created_at,
@@ -106,25 +107,44 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: ()
 
   if (!event) {
     return (
-      <main className="p-6">
-        <p className="text-muted-foreground">Loading event...</p>
+      <main className="min-h-[calc(100vh-4rem)] bg-[#F7FBF8] p-6">
+        <div className="flex h-64 items-center justify-center">
+          <div className="h-12 w-12 animate-spin rounded-full border-2 border-[#E8EAEB] border-b-[#00D47E]" />
+        </div>
       </main>
     )
   }
 
   return (
-    <main className="p-6">
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center gap-4">
-          <Button variant="outline" size="icon" onClick={handleBack} className="rounded-lg bg-transparent">
-            <ArrowLeft className="h-4 w-4" />
-          </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">{event.name}</h1>
-            <p className="text-muted-foreground">
-              {event.type} • {event.venue}
-            </p>
+    <main className="min-h-[calc(100vh-4rem)] bg-[#F7FBF8] p-4 sm:p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="relative overflow-hidden rounded-3xl bg-[#0B1F14] px-5 py-6 text-white sm:px-7">
+          <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#00D47E]/25" />
+          <div className="pointer-events-none absolute -bottom-16 left-1/3 h-32 w-40 rounded-full bg-[#017C7C]/40" />
+          <div className="relative flex items-start gap-4">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={handleBack}
+              className="h-10 w-10 shrink-0 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+            >
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0">
+              <span className="inline-flex rounded-full bg-[#00D47E]/15 px-2.5 py-1 text-xs font-semibold text-[#00D47E]">
+                {event.type}
+              </span>
+              <h1 className="mt-2 text-2xl font-semibold leading-tight sm:text-3xl">{event.name}</h1>
+              <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/70">
+                <span className="inline-flex items-center gap-1.5">
+                  <MapPin className="h-4 w-4 text-[#00D47E]" />
+                  {event.venue}
+                </span>
+                <span className="font-semibold text-[#00D47E]">
+                  ₱{Number(event.price).toLocaleString()}
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 

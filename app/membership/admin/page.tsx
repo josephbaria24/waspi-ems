@@ -182,9 +182,9 @@ export default function MembershipAdminPage() {
 
     if (isCheckingAuth) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-background gap-4">
-                <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                <p className="text-muted-foreground font-medium">Verifying authorization...</p>
+            <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-[#F7FBF8]">
+                <div className="h-12 w-12 animate-spin rounded-full border-2 border-[#E8EAEB] border-b-[#00D47E]" />
+                <p className="text-sm text-[#8D959D]">Verifying authorization...</p>
             </div>
         );
     }
@@ -192,23 +192,31 @@ export default function MembershipAdminPage() {
     // ==================== MEMBER DETAIL VIEW ====================
     if (selectedMember) {
         return (
-            <main className="min-h-screen bg-background">
-                <div className="container mx-auto p-6 max-w-4xl space-y-6">
-                    <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setSelectedMember(null)}
-                        className="gap-1"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to List
-                    </Button>
+            <main className="min-h-screen bg-[#F7FBF8]">
+                <div className="mx-auto max-w-5xl space-y-6 p-4 sm:p-6">
+                    <div className="relative overflow-hidden rounded-3xl bg-[#0B1F14] px-5 py-5 text-white sm:px-6">
+                        <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-32 rounded-full bg-[#00D47E]/25" />
+                        <div className="relative flex items-center gap-3">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={() => setSelectedMember(null)}
+                                className="h-10 w-10 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                            </Button>
+                            <div>
+                                <p className="text-xs text-white/60">Membership application</p>
+                                <h1 className="text-xl font-semibold">{selectedMember.profile.fullName}</h1>
+                            </div>
+                        </div>
+                    </div>
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                         {/* Member Info */}
-                        <Card>
+                        <Card className="rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
                             <CardHeader>
-                                <CardTitle className="text-lg">Member Details</CardTitle>
+                                <CardTitle className="text-lg text-[#1E1E1E]">Member Details</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-3">
                                 <div className="space-y-2 text-sm">
@@ -288,7 +296,7 @@ export default function MembershipAdminPage() {
                                         <Button
                                             onClick={() => handleReview(selectedMember.id, "approve")}
                                             disabled={reviewingId === selectedMember.id}
-                                            className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                                            className="h-11 flex-1 rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]"
                                         >
                                             {reviewingId === selectedMember.id ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -300,7 +308,7 @@ export default function MembershipAdminPage() {
                                             onClick={() => handleReview(selectedMember.id, "decline", declineReason)}
                                             disabled={reviewingId === selectedMember.id}
                                             variant="outline"
-                                            className="flex-1 border-red-500/30 text-red-600 hover:bg-red-500/10"
+                                            className="h-11 flex-1 rounded-full border-red-200 text-red-600 hover:bg-red-50"
                                         >
                                             {reviewingId === selectedMember.id ? (
                                                 <Loader2 className="h-4 w-4 animate-spin" />
@@ -315,10 +323,10 @@ export default function MembershipAdminPage() {
                         </Card>
 
                         {/* Receipt Preview */}
-                        <Card>
+                        <Card className="rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
                             <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2">
-                                    <FileImage className="h-5 w-5 text-primary" />
+                                <CardTitle className="flex items-center gap-2 text-lg text-[#1E1E1E]">
+                                    <FileImage className="h-5 w-5 text-[#017C7C]" />
                                     Receipts
                                 </CardTitle>
                             </CardHeader>
@@ -366,130 +374,142 @@ export default function MembershipAdminPage() {
     }
 
     // ==================== MEMBERS LIST ====================
+    const statCards = [
+        { label: "Total", value: stats.total, hint: "Applications", icon: Users, tint: "bg-emerald-50 text-emerald-700" },
+        { label: "Pending", value: stats.pending, hint: "Awaiting review", icon: Clock, tint: "bg-amber-50 text-amber-700" },
+        { label: "Active", value: stats.active, hint: "Approved members", icon: CheckCircle2, tint: "bg-[#00D47E]/15 text-[#0B1F14]" },
+        { label: "Declined", value: stats.declined, hint: "Needs reupload", icon: XCircle, tint: "bg-red-50 text-red-600" },
+    ]
+
     return (
-        <main className="min-h-screen bg-background">
-            <div className="container mx-auto p-6 max-w-6xl space-y-6">
+        <main className="min-h-screen bg-[#F7FBF8]">
+            <div className="mx-auto max-w-7xl space-y-6 p-4 sm:p-6">
                 {showSetup ? (
                     <MembershipSetup onBack={() => setShowSetup(false)} />
                 ) : (
                 <>
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-                            <Users className="h-6 w-6 text-primary" />
-                            Membership Applications
-                        </h1>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Review and manage membership registrations
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button
-                            size="sm"
-                            onClick={() => setShowSetup(true)}
-                            className="gap-1"
-                        >
-                            <Settings2 className="h-4 w-4" />
-                            Setup
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => window.location.href = "/events"}
-                            className="gap-1"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            Back to Dashboard
-                        </Button>
+                <div className="relative overflow-hidden rounded-3xl bg-[#0B1F14] px-5 py-6 text-white sm:px-7">
+                    <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#00D47E]/25" />
+                    <div className="pointer-events-none absolute -bottom-16 left-1/3 h-32 w-40 rounded-full bg-[#017C7C]/40" />
+                    <div className="relative flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="flex items-start gap-3">
+                            <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#00D47E] text-[#0B1F14]">
+                                <Users className="h-6 w-6" />
+                            </div>
+                            <div>
+                                <h1 className="text-2xl font-semibold sm:text-3xl">Membership Applications</h1>
+                                <p className="mt-1 text-sm text-white/70">Review and manage membership registrations</p>
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                onClick={() => setShowSetup(true)}
+                                className="h-10 rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]"
+                            >
+                                <Settings2 className="h-4 w-4" />
+                                Setup
+                            </Button>
+                            <Button
+                                variant="outline"
+                                onClick={() => { window.location.href = "/events" }}
+                                className="h-10 rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
+                            >
+                                <ArrowLeft className="h-4 w-4" />
+                                Back to Dashboard
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
-                {/* Stats */}
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                    {[
-                        { label: "Total", value: stats.total, color: "text-foreground" },
-                        { label: "Pending", value: stats.pending, color: "text-amber-500" },
-                        { label: "Active", value: stats.active, color: "text-green-500" },
-                        { label: "Declined", value: stats.declined, color: "text-red-500" },
-                    ].map((stat) => (
-                        <Card key={stat.label} className="border">
-                            <CardContent className="p-4 text-center">
-                                <p className={`text-2xl font-bold ${stat.color}`}>{stat.value}</p>
-                                <p className="text-xs text-muted-foreground">{stat.label}</p>
-                            </CardContent>
-                        </Card>
-                    ))}
+                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                    {statCards.map((stat) => {
+                        const Icon = stat.icon
+                        return (
+                            <div key={stat.label} className="rounded-2xl border border-[#E8EAEB] bg-white p-4 shadow-sm">
+                                <div className="flex items-start justify-between gap-3">
+                                    <div>
+                                        <p className="text-xs font-semibold uppercase tracking-wide text-[#8D959D]">{stat.label}</p>
+                                        <p className="mt-1 text-2xl font-semibold text-[#1E1E1E] sm:text-3xl">{stat.value}</p>
+                                    </div>
+                                    <span className={`flex h-10 w-10 items-center justify-center rounded-xl ${stat.tint}`}>
+                                        <Icon className="h-5 w-5" />
+                                    </span>
+                                </div>
+                                <p className="mt-3 text-xs text-[#8D959D]">{stat.hint}</p>
+                            </div>
+                        )
+                    })}
                 </div>
 
-                {/* Filter & Search */}
-                <div className="flex flex-col sm:flex-row gap-3">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
                     <div className="relative flex-1">
-                        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8D959D]" />
                         <Input
                             placeholder="Search by name, email, or tracking number..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9"
+                            className="h-11 rounded-full border-[#E8EAEB] bg-white pl-9 shadow-none focus-visible:border-[#00D47E] focus-visible:ring-[#00D47E]/20"
                         />
                     </div>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1 rounded-full border border-[#E8EAEB] bg-white p-1">
                         {(["all", "Pending", "Active", "Declined"] as const).map((f) => (
-                            <Button
+                            <button
                                 key={f}
-                                variant={filter === f ? "default" : "outline"}
-                                size="sm"
+                                type="button"
                                 onClick={() => setFilter(f)}
-                                className={filter === f ? "bg-primary text-primary-foreground" : ""}
+                                className={`rounded-full px-3.5 py-2 text-sm font-semibold transition ${
+                                    filter === f
+                                        ? "bg-[#00D47E] text-[#0B1F14]"
+                                        : "text-[#8D959D] hover:text-[#0B1F14]"
+                                }`}
                             >
                                 {f === "all" ? "All" : f}
-                            </Button>
+                            </button>
                         ))}
                     </div>
                 </div>
 
-                {/* Members Table */}
                 {isLoading ? (
-                    <div className="flex justify-center items-center py-20">
-                        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                    <div className="flex items-center justify-center py-20">
+                        <div className="h-10 w-10 animate-spin rounded-full border-2 border-[#E8EAEB] border-b-[#00D47E]" />
                     </div>
                 ) : filteredMembers.length === 0 ? (
-                    <Card>
-                        <CardContent className="py-16 text-center">
-                            <Users className="h-12 w-12 text-muted-foreground/30 mx-auto mb-3" />
-                            <p className="text-muted-foreground">No membership applications found</p>
-                        </CardContent>
-                    </Card>
+                    <div className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-[#CDEEDD] bg-white px-6 py-16 text-center">
+                        <span className="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-[#00D47E]/15 text-[#0B1F14]">
+                            <Users className="h-7 w-7" />
+                        </span>
+                        <p className="text-lg font-semibold text-[#1E1E1E]">No membership applications found</p>
+                    </div>
                 ) : (
-                    <Card className="border overflow-hidden">
+                    <div className="overflow-hidden rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="bg-muted/50 border-b">
+                                <thead className="border-b border-[#E8EAEB] bg-[#F7FBF8]">
                                     <tr>
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Name</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground hidden md:table-cell">Email</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Tracking #</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground hidden sm:table-cell">Type</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Status</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Receipt</th>
-                                        <th className="text-left p-3 font-medium text-muted-foreground">Actions</th>
+                                        <th className="p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Name</th>
+                                        <th className="hidden p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D] md:table-cell">Email</th>
+                                        <th className="p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Tracking #</th>
+                                        <th className="hidden p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D] sm:table-cell">Type</th>
+                                        <th className="p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Status</th>
+                                        <th className="p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Receipt</th>
+                                        <th className="p-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]">Actions</th>
                                     </tr>
                                 </thead>
-                                <tbody className="divide-y divide-border">
+                                <tbody className="divide-y divide-[#E8EAEB]">
                                     {filteredMembers.map((member) => (
-                                        <tr key={member.id} className="hover:bg-muted/30 transition-colors">
-                                            <td className="p-3 font-medium">{member.profile.fullName}</td>
-                                            <td className="p-3 text-muted-foreground hidden md:table-cell">{member.profile.email}</td>
-                                            <td className="p-3 font-mono text-xs text-primary">{member.trackingNumber || "—"}</td>
-                                            <td className="p-3 capitalize hidden sm:table-cell">{member.membershipType}</td>
+                                        <tr key={member.id} className="transition-colors hover:bg-[#F7FBF8]">
+                                            <td className="p-3 font-medium text-[#1E1E1E]">{member.profile.fullName}</td>
+                                            <td className="hidden p-3 text-[#8D959D] md:table-cell">{member.profile.email}</td>
+                                            <td className="p-3 font-mono text-xs font-semibold text-[#017C7C]">{member.trackingNumber || "—"}</td>
+                                            <td className="hidden p-3 capitalize text-[#1E1E1E] sm:table-cell">{member.membershipType}</td>
                                             <td className="p-3">{getStatusBadge(member.status)}</td>
                                             <td className="p-3">
                                                 {(member.receipts?.length || member.receiptUrl) ? (
-                                                    <span className="text-green-600 text-xs font-medium">
-                                                        ✓ {member.receipts?.length || 1} uploaded
+                                                    <span className="text-xs font-semibold text-emerald-700">
+                                                        {member.receipts?.length || 1} uploaded
                                                     </span>
                                                 ) : (
-                                                    <span className="text-muted-foreground text-xs">None</span>
+                                                    <span className="text-xs text-[#8D959D]">None</span>
                                                 )}
                                             </td>
                                             <td className="p-3">
@@ -498,9 +518,9 @@ export default function MembershipAdminPage() {
                                                         variant="ghost"
                                                         size="sm"
                                                         onClick={() => setSelectedMember(member)}
-                                                        className="h-7 px-2 text-xs"
+                                                        className="h-8 rounded-full px-2.5 text-xs text-[#0B1F14] hover:bg-[#00D47E]/15"
                                                     >
-                                                        <Eye className="h-3 w-3 mr-1" />
+                                                        <Eye className="mr-1 h-3 w-3" />
                                                         View
                                                     </Button>
                                                     {member.status === "Pending" && member.receiptUrl && (
@@ -509,9 +529,9 @@ export default function MembershipAdminPage() {
                                                                 size="sm"
                                                                 onClick={() => handleReview(member.id, "approve")}
                                                                 disabled={reviewingId === member.id}
-                                                                className="h-7 px-2 text-xs bg-green-600 hover:bg-green-700 text-white"
+                                                                className="h-8 rounded-full bg-[#00D47E] px-3 text-xs font-semibold text-[#0B1F14] hover:bg-[#00c174]"
                                                             >
-                                                                {reviewingId === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✓"}
+                                                                {reviewingId === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Approve"}
                                                             </Button>
                                                             <Button
                                                                 variant="outline"
@@ -521,9 +541,9 @@ export default function MembershipAdminPage() {
                                                                     setShowDeclineForm(true);
                                                                 }}
                                                                 disabled={reviewingId === member.id}
-                                                                className="h-7 px-2 text-xs border-red-500/30 text-red-600"
+                                                                className="h-8 rounded-full border-red-200 px-3 text-xs text-red-600 hover:bg-red-50"
                                                             >
-                                                                {reviewingId === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "✗"}
+                                                                {reviewingId === member.id ? <Loader2 className="h-3 w-3 animate-spin" /> : "Decline"}
                                                             </Button>
                                                         </>
                                                     )}
@@ -534,7 +554,7 @@ export default function MembershipAdminPage() {
                                 </tbody>
                             </table>
                         </div>
-                    </Card>
+                    </div>
                 )}
                 </>
                 )}
