@@ -13,6 +13,7 @@ export type Event = {
   magic_link?: string
   start_date?: string
   end_date?: string
+  status?: string
 }
 
 // Extended Event type with detailed attendee stats

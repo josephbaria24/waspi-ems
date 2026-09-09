@@ -150,7 +150,7 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: ()
 
         {/* Two Column Layout */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          <EventDetailsCard event={event} onAttendeeAdded={handleRefresh} />
+          <EventDetailsCard event={event} onAttendeeAdded={handleRefresh} onUpdated={handleRefresh} />
           <AttendeesList
             eventId={eventId}
             scheduleDates={event.schedule.map((s) => ({ date: s.date }))}

@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle, Users, Mic, UserCircle } from "lucide-react"
+import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle, Users, Mic, UserCircle, Trash2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -13,6 +13,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase-client"
+import { attendanceMatchesDate, scheduleDateEpoch } from "@/lib/attendance-date"
 
 interface Attendee {
   id: number
@@ -37,7 +38,7 @@ interface EventScheduleDate {
   date: string // ISO format e.g. "2025-11-06"
 }
 
-type QuickActionMode = "payment" | "attendance" | "email" | "organizer" | "speaker" | "attendee" | null
+type QuickActionMode = "payment" | "attendance" | "email" | "organizer" | "speaker" | "attendee" | "delete" | null
 
 interface EmailResult {
   name: string
@@ -105,22 +106,18 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
   }, [])
 
   const toggleAttendance = async (attendeeId: number, isoDate: string) => {
-    const epochDate = new Date(isoDate).getTime()
+    const epochDate = scheduleDateEpoch(isoDate)
 
     const attendee = attendees.find((a) => a.id === attendeeId)
     if (!attendee) return
 
-    const current = attendee.attendance.find((a) => a.date === epochDate)
-    let updatedAttendance = [...attendee.attendance]
+    const current = attendee.attendance.find((a) => attendanceMatchesDate(a.date, isoDate))
+    let updatedAttendance = attendee.attendance.filter((a) => !attendanceMatchesDate(a.date, isoDate))
 
     if (!current) {
       updatedAttendance.push({ date: epochDate, status: "Present" })
     } else if (current.status === "Present") {
-      updatedAttendance = updatedAttendance.map((a) =>
-        a.date === epochDate ? { ...a, status: "Absent" } : a
-      )
-    } else if (current.status === "Absent") {
-      updatedAttendance = updatedAttendance.filter((a) => a.date !== epochDate)
+      updatedAttendance.push({ date: epochDate, status: "Absent" })
     }
 
     await supabase
@@ -377,6 +374,26 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
       return
     }
 
+    if (quickActionMode === "delete") {
+      const confirmed = window.confirm(`Delete ${selectedIds.length} attendee(s)? This cannot be undone.`)
+      if (!confirmed) return
+
+      const { error } = await supabase
+        .from("attendees")
+        .delete()
+        .in("id", selectedIds)
+
+      if (error) {
+        alert(error.message || "Failed to delete attendees")
+        return
+      }
+
+      setAttendees(prev => prev.filter(a => !selectedIds.includes(a.id)))
+      alert(`Deleted ${selectedIds.length} attendee(s)`)
+      handleCancelQuickAction()
+      return
+    }
+
     if (quickActionMode === "payment") {
       const updates = selectedIds.map(id =>
         supabase
@@ -444,22 +461,14 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
 
       alert(`✅ Marked ${selectedIds.length} attendee(s) as ${roleToAdd}`)
     } else if (quickActionMode === "attendance" && selectedDate) {
-      const epochDate = new Date(selectedDate).getTime()
+      const epochDate = scheduleDateEpoch(selectedDate)
 
       const updates = selectedIds.map(async (id) => {
         const attendee = attendees.find(a => a.id === id)
         if (!attendee) return
 
-        const existing = attendee.attendance.find(a => a.date === epochDate)
-        let updatedAttendance = [...attendee.attendance]
-
-        if (!existing) {
-          updatedAttendance.push({ date: epochDate, status: "Present" })
-        } else {
-          updatedAttendance = updatedAttendance.map(a =>
-            a.date === epochDate ? { ...a, status: "Present" } : a
-          )
-        }
+        const updatedAttendance = attendee.attendance.filter(a => !attendanceMatchesDate(a.date, selectedDate))
+        updatedAttendance.push({ date: epochDate, status: "Present" })
 
         return supabase
           .from("attendees")
@@ -516,8 +525,7 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
   }, [attendees, searchQuery])
 
   const getStatusDisplay = useCallback((attendee: Attendee, date: string) => {
-    const epochDate = new Date(date).getTime()
-    const record = attendee.attendance.find((a) => a.date === epochDate)
+    const record = attendee.attendance.find((a) => attendanceMatchesDate(a.date, date))
     return record?.status ?? "Pending"
   }, [])
 
@@ -623,6 +631,13 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                     <UserCircle className="h-4 w-4 mr-2" />
                     Mark as Attendee
                   </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={() => handleQuickActionSelect("delete")}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Delete attendees
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -645,7 +660,9 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                               ? "Quick Mark as Speaker"
                               : quickActionMode === "attendee"
                                 ? "Quick Mark as Attendee"
-                                : "Send Confirmation Emails"}
+                                : quickActionMode === "delete"
+                                  ? "Delete selected attendees"
+                                  : "Send Confirmation Emails"}
                     </span>
                   </div>
                   <Button
@@ -702,7 +719,11 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                         </>
                       ) : (
                         <>
-                          {quickActionMode === "email" ? "Send Emails" : `Apply to ${selectedIds.length}`}
+                          {quickActionMode === "email"
+                            ? "Send Emails"
+                            : quickActionMode === "delete"
+                              ? `Delete ${selectedIds.length}`
+                              : `Apply to ${selectedIds.length}`}
                         </>
                       )}
                     </Button>

@@ -37,12 +37,14 @@ export default async function SubmissionPage(props: {
     )
   }
 
-  // Use exact match instead of ilike for precise reference_id matching
-  const { data: attendee, error: attendeeError } = await supabaseServer
+  const { data: matches, error: attendeeError } = await supabaseServer
     .from("attendees")
     .select("personal_name, last_name, email, reference_id, event_id")
     .eq("reference_id", ref)
-    .single<Attendee>()
+    .order("id", { ascending: false })
+    .limit(1)
+
+  const attendee = matches?.[0] as Attendee | undefined
 
   if (attendeeError || !attendee) {
     console.log("❌ Attendee error:", attendeeError)

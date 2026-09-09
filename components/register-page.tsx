@@ -35,6 +35,7 @@ export default function RegisterPage() {
   const [event, setEvent] = useState<EventData | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const submitLock = useRef(false)
   const [submitted, setSubmitted] = useState(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editMode, setEditMode] = useState(false)
@@ -336,7 +337,8 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!event || submitting) return
+    if (!event || submitting || submitLock.current) return
+    submitLock.current = true
 
     if (!dataPrivacyAgreed) {
       toast({
@@ -401,7 +403,7 @@ export default function RegisterPage() {
               reference_id: attendee.reference_id,
               event_name: event.name,
               venue: event.venue,
-              link: `${window.location.origin}/submission/${attendee.reference_id}`,
+              link: `${window.location.origin}/submission/${encodeURIComponent(attendee.reference_id)}`,
             }),
           })
 
@@ -438,6 +440,7 @@ export default function RegisterPage() {
         description: "An unexpected error occurred. Please try again.",
       })
     } finally {
+      submitLock.current = false
       setSubmitting(false)
     }
   }
@@ -841,22 +844,22 @@ export default function RegisterPage() {
 
             <Separator />
 
-            <div className="flex items-start space-x-3">
+            <label
+              htmlFor="data_privacy"
+              className="flex cursor-pointer items-start gap-3 rounded-xl border-2 border-[#00D47E] bg-[#F7FBF8] p-4"
+            >
               <Checkbox
                 id="data_privacy"
                 checked={dataPrivacyAgreed}
                 onCheckedChange={(checked) => setDataPrivacyAgreed(checked as boolean)}
                 disabled={submitting}
+                className="mt-0.5 size-6 border-2 border-[#0B1F14] bg-white data-[state=checked]:border-[#00D47E] data-[state=checked]:bg-[#00D47E] data-[state=checked]:text-[#0B1F14]"
               />
-              <div className="space-y-1 leading-none">
-                <Label
-                  htmlFor="data_privacy"
-                  className="text-sm font-normal cursor-pointer"
-                >
-                  I agree to the data privacy policy and consent to the collection and processing of my personal information for event registration purposes. <span className="text-destructive">*</span>
-                </Label>
-              </div>
-            </div>
+              <span className="text-sm font-medium leading-6 text-[#1E1E1E]">
+                I agree to the data privacy policy and consent to the collection and processing of my personal information for event registration purposes.{" "}
+                <span className="font-semibold text-red-600">*</span>
+              </span>
+            </label>
 
             <Button
               type="submit"

@@ -1,12 +1,13 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Plus, CalendarDays, Clock4, Users, CheckCircle2, CreditCard } from "lucide-react"
+import { Plus, CalendarDays, Clock4, Users, CheckCircle2, CreditCard, Archive } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { EventModal } from "@/components/event-modal"
 import { EventCard } from "@/components/event-card"
 import type { Event } from "@/types/event"
 import { supabase } from "@/lib/supabase-client"
+import { toast } from "sonner"
 
 // Extended version of Event that adds attendee stats
 type EventWithStats = Omit<Event, "attendees"> & {
@@ -149,6 +150,7 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
           createdAt: event.created_at,
           start_date: event.start_date,
           end_date: event.end_date,
+          status: event.status,
         }
       })
 
@@ -160,8 +162,10 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
       const upcoming = formattedEvents.filter((e) => parseDate(e.end_date) >= now)
       const past = formattedEvents.filter((e) => parseDate(e.end_date) < now)
 
-      upcoming.sort((a, b) => parseDate(a.start_date).getTime() - parseDate(b.start_date).getTime())
-      past.sort((a, b) => parseDate(b.start_date).getTime() - parseDate(a.start_date).getTime())
+      const bySchedule = (a: EventWithStats, b: EventWithStats) =>
+        parseDate(b.start_date).getTime() - parseDate(a.start_date).getTime()
+      upcoming.sort(bySchedule)
+      past.sort(bySchedule)
 
       setEvents([...upcoming, ...past])
       setIsLoading(false)
@@ -170,21 +174,82 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
     fetchEvents()
   }, [])
 
-  const handleCreateEvent = (newEvent: Omit<Event, "id" | "attendees" | "createdAt">) => {
+  const handleCreateEvent = async (newEvent: Omit<Event, "id" | "attendees" | "createdAt">) => {
+    const response = await fetch("/api/events", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(newEvent),
+    })
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      throw new Error(data.error || "Failed to save event.")
+    }
+
+    const saved = data.event
     const event: EventWithStats = {
       ...newEvent,
-      id: Date.now().toString(),
+      id: String(saved.id),
       attendees: { registered: 0, attended: 0, paid: 0 },
-      createdAt: new Date().toISOString(),
+      createdAt: saved.created_at,
+      start_date: saved.start_date,
+      end_date: saved.end_date,
+      magic_link: saved.magic_link,
+      feature_image: saved.feature_image,
+      status: saved.status || "active",
     }
-    setEvents([...events, event])
+    setEvents((current) => [event, ...current])
     setIsModalOpen(false)
+    toast.success("Event created")
   }
 
   const now = new Date()
   const parseDate = (value?: string) => (value ? new Date(value) : new Date(0))
-  const upcomingEvents = events.filter((e) => parseDate(e.end_date) >= now)
-  const pastEvents = events.filter((e) => parseDate(e.end_date) < now)
+  const isArchived = (event: EventWithStats) => (event.status || "").toLowerCase() === "archived"
+  const scheduleTime = (event: EventWithStats) => {
+    const dates = [
+      event.start_date,
+      event.end_date,
+      ...(event.schedule || []).map((day) => day.date),
+    ].filter(Boolean) as string[]
+    return Math.max(0, ...dates.map((value) => parseDate(value).getTime()))
+  }
+  const bySchedule = (a: EventWithStats, b: EventWithStats) => scheduleTime(b) - scheduleTime(a)
+  const upcomingEvents = events.filter((e) => !isArchived(e) && parseDate(e.end_date) >= now).sort(bySchedule)
+  const pastEvents = events.filter((e) => !isArchived(e) && parseDate(e.end_date) < now).sort(bySchedule)
+  const archivedEvents = events.filter(isArchived).sort(bySchedule)
+
+  const handleEventAction = async (event: EventWithStats, action: "archive" | "activate" | "deactivate" | "delete") => {
+    if (action === "delete" && !window.confirm(`Delete "${event.name}"? This cannot be undone.`)) {
+      return
+    }
+
+    const response = action === "delete"
+      ? await fetch(`/api/events?id=${event.id}`, { method: "DELETE" })
+      : await fetch("/api/events", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: event.id, action }),
+        })
+
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) {
+      toast.error(data.error || "Could not update event")
+      return
+    }
+
+    if (action === "delete") {
+      setEvents((current) => current.filter((item) => item.id !== event.id))
+      toast.success("Event deleted")
+      return
+    }
+
+    setEvents((current) =>
+      current.map((item) =>
+        item.id === event.id ? { ...item, status: data.event?.status || action } : item,
+      ),
+    )
+    toast.success(action === "archive" ? "Event archived" : action === "deactivate" ? "Event deactivated" : "Event updated")
+  }
 
   // Calculate total stats across all events
   const totalStats = events.reduce(
@@ -334,7 +399,12 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {upcomingEvents.map((event) => (
-                <EventCard key={event.id} event={event} onSelect={() => onSelectEvent(event.id)} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onSelect={() => onSelectEvent(event.id)}
+                  onAction={(action) => handleEventAction(event, action)}
+                />
               ))}
             </div>
           </section>
@@ -353,7 +423,36 @@ export function EventsDashboard({ onSelectEvent }: { onSelectEvent: (id: string)
             </div>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {pastEvents.map((event) => (
-                <EventCard key={event.id} event={event} onSelect={() => onSelectEvent(event.id)} />
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onSelect={() => onSelectEvent(event.id)}
+                  onAction={(action) => handleEventAction(event, action)}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        {archivedEvents.length > 0 && (
+          <section className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-[#E8EAEB] text-[#8D959D]">
+                <Archive className="h-4 w-4" />
+              </span>
+              <h2 className="text-lg font-semibold text-[#1E1E1E] sm:text-xl">Archived</h2>
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-xs font-semibold text-[#8D959D] ring-1 ring-[#E8EAEB]">
+                {archivedEvents.length}
+              </span>
+            </div>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {archivedEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onSelect={() => onSelectEvent(event.id)}
+                  onAction={(action) => handleEventAction(event, action)}
+                />
               ))}
             </div>
           </section>

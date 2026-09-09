@@ -1,6 +1,12 @@
 "use client"
 
-import { Calendar, Clock, MapPin } from "lucide-react"
+import { Archive, Calendar, Clock, MapPin, MoreHorizontal, Power, Trash2 } from "lucide-react"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import type { Event } from "@/types/event"
 
 type EventWithStats = Omit<Event, "attendees"> & {
@@ -35,13 +41,24 @@ function formatTime(value?: string) {
   return `${hour12}:${minutes || "00"} ${period}`
 }
 
-export function EventCard({ event, onSelect }: { event: EventWithStats; onSelect: () => void }) {
+export function EventCard({
+  event,
+  onSelect,
+  onAction,
+}: {
+  event: EventWithStats
+  onSelect: () => void
+  onAction: (action: "archive" | "activate" | "deactivate" | "delete") => void
+}) {
   const firstDay = event.schedule?.[0]
   const dateLabel = formatDate(event.start_date || firstDay?.date)
   const start = formatTime(firstDay?.timeIn)
   const end = formatTime(firstDay?.timeOut)
   const timeLabel = start && end ? `${start} - ${end}` : start || end || "Time TBA"
   const imageIndex = Number.parseInt(event.id, 10) % PLACEHOLDERS.length || 0
+  const status = (event.status || "active").toLowerCase()
+  const archived = status === "archived"
+  const inactive = status === "inactive"
 
   return (
     <article className="flex h-full flex-col rounded-[28px] border border-[#E8EAEB] bg-white p-3 shadow-sm">
@@ -58,9 +75,16 @@ export function EventCard({ event, onSelect }: { event: EventWithStats; onSelect
       </div>
 
       <div className="flex flex-1 flex-col px-2 pb-2 pt-4">
-        <h3 className="line-clamp-2 text-[17px] font-semibold leading-snug text-[#1E1E1E]">
-          {event.name}
-        </h3>
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="line-clamp-2 text-[17px] font-semibold leading-snug text-[#1E1E1E]">
+            {event.name}
+          </h3>
+          {(archived || inactive) && (
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold ${archived ? "bg-[#E8EAEB] text-[#8D959D]" : "bg-amber-50 text-amber-700"}`}>
+              {archived ? "Archived" : "Inactive"}
+            </span>
+          )}
+        </div>
 
         <div className="mt-3 flex items-center gap-2 text-sm text-[#8D959D]">
           <MapPin className="h-4 w-4 shrink-0 text-[#F97316]" />
@@ -78,13 +102,45 @@ export function EventCard({ event, onSelect }: { event: EventWithStats; onSelect
           </span>
         </div>
 
-        <button
-          type="button"
-          onClick={onSelect}
-          className="mt-5 w-full rounded-full bg-[#3F3A63] py-3 text-sm font-semibold text-white transition hover:bg-[#322e52]"
-        >
-          View Event
-        </button>
+        <div className="mt-5 flex gap-2">
+          <button
+            type="button"
+            onClick={onSelect}
+            className="h-11 flex-1 rounded-full bg-[#3F3A63] text-sm font-semibold text-white transition hover:bg-[#322e52]"
+          >
+            View Event
+          </button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#E8EAEB] text-[#1E1E1E] transition hover:bg-[#F7FBF8]"
+                aria-label="Event actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44 rounded-xl">
+              <DropdownMenuItem onClick={() => onAction(archived ? "activate" : "archive")}>
+                <Archive className="h-4 w-4" />
+                {archived ? "Unarchive" : "Archive"}
+              </DropdownMenuItem>
+              {!archived && (
+                <DropdownMenuItem onClick={() => onAction(inactive ? "activate" : "deactivate")}>
+                  <Power className="h-4 w-4" />
+                  {inactive ? "Activate" : "Deactivate"}
+                </DropdownMenuItem>
+              )}
+              <DropdownMenuItem
+                className="text-red-600 focus:text-red-600"
+                onClick={() => onAction("delete")}
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </article>
   )

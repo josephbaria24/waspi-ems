@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { EventCoverCrop } from "@/components/event-cover-crop"
 import type { Event } from "@/types/event"
 
 const EVENT_TYPES = [
@@ -54,7 +55,7 @@ export function EventModal({
 }: {
   isOpen: boolean
   onClose: () => void
-  onSubmit: (data: EventFormData) => void
+  onSubmit: (data: EventFormData) => void | Promise<void>
 }) {
   const [formData, setFormData] = useState<EventFormData>({
     name: "",
@@ -65,11 +66,31 @@ export function EventModal({
   })
 
   const [topicInput, setTopicInput] = useState("")
+  const [priceInput, setPriceInput] = useState("")
+  const [coverImage, setCoverImage] = useState("")
+  const [submitError, setSubmitError] = useState("")
+  const [isSaving, setIsSaving] = useState(false)
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (formData.name && formData.venue && formData.schedule[0].coveredTopics.length > 0) {
-      onSubmit(formData)
+    const topics = formData.schedule.flatMap((day) => day.coveredTopics)
+    if (!formData.name.trim() || !formData.venue.trim()) {
+      setSubmitError("Event name and venue are required.")
+      return
+    }
+    if (!formData.schedule.some((day) => day.date)) {
+      setSubmitError("Add at least one schedule date.")
+      return
+    }
+    if (topics.length === 0) {
+      setSubmitError("Add at least one covered topic, then click Add.")
+      return
+    }
+
+    setSubmitError("")
+    setIsSaving(true)
+    try {
+      await onSubmit({ ...formData, feature_image: coverImage || undefined })
       setFormData({
         name: "",
         type: "Conference",
@@ -78,6 +99,12 @@ export function EventModal({
         schedule: [{ ...emptyDay }],
       })
       setTopicInput("")
+      setPriceInput("")
+      setCoverImage("")
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Failed to save event.")
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -139,7 +166,19 @@ export function EventModal({
         </div>
 
         <form onSubmit={handleSubmit} className="max-h-[calc(90vh-8.5rem)] space-y-5 overflow-y-auto px-6 py-5">
+          {submitError && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {submitError}
+            </div>
+          )}
           <div className="grid gap-4 sm:grid-cols-2">
+            <div className="sm:col-span-2">
+              <Label className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
+                Cover image
+              </Label>
+              <EventCoverCrop value={coverImage} onChange={setCoverImage} />
+            </div>
+
             <div className="sm:col-span-2">
               <Label htmlFor="name" className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
                 <Presentation className="h-3.5 w-3.5 text-[#017C7C]" />
@@ -194,16 +233,18 @@ export function EventModal({
                 </span>
                 <Input
                   id="price"
-                  type="number"
-                  min={0}
-                  step="0.01"
-                  value={formData.price}
-                  onChange={(e) =>
+                  type="text"
+                  inputMode="decimal"
+                  value={priceInput}
+                  onChange={(e) => {
+                    const raw = e.target.value
+                    if (raw !== "" && !/^\d*\.?\d*$/.test(raw)) return
+                    setPriceInput(raw)
                     setFormData({
                       ...formData,
-                      price: parseFloat(e.target.value) || 0,
+                      price: raw === "" ? 0 : Number.parseFloat(raw) || 0,
                     })
-                  }
+                  }}
                   placeholder="0.00"
                   className={`${fieldClass} pl-8`}
                 />
@@ -384,9 +425,10 @@ export function EventModal({
             </Button>
             <Button
               type="submit"
+              disabled={isSaving}
               className="h-11 flex-1 rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]"
             >
-              Create Event
+              {isSaving ? "Saving..." : "Create Event"}
             </Button>
           </div>
         </form>

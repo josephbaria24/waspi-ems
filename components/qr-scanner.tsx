@@ -13,6 +13,7 @@ import jsQR from 'jsqr';
 // Import your supabase client
 // @ts-ignore
 import { supabase } from '@/lib/supabase-client';
+import { attendanceMatchesDate, localDateKey, scheduleDateEpoch } from '@/lib/attendance-date';
 
 export function QRScanner({ eventId = "1" }: { eventId?: string }) {
   const [scanning, setScanning] = useState(false);
@@ -36,6 +37,9 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
   const scanIntervalRef = useRef<number | null>(null);
   const lastScannedRef = useRef<string>('');
   const lastScanTimeRef = useRef<number>(0);
+  const facingRef = useRef<'environment' | 'user'>('environment');
+  const [facing, setFacing] = useState<'environment' | 'user'>('environment');
+  const [starting, setStarting] = useState(false);
 
   useEffect(() => {
     return () => {
@@ -43,75 +47,138 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
     };
   }, []);
 
-  const startScanning = async () => {
+  const cameraErrorMessage = (err: any) => {
+    const name = err?.name || '';
+    if (!window.isSecureContext) {
+      return 'Camera needs a secure page. Open this scanner over HTTPS, or use localhost.';
+    }
+    if (name === 'NotAllowedError' || name === 'PermissionDeniedError') {
+      return 'Camera permission was blocked. Allow camera access in the browser, then try again.';
+    }
+    if (name === 'NotFoundError' || name === 'DevicesNotFoundError') {
+      return 'No camera was found on this device.';
+    }
+    if (name === 'NotReadableError' || name === 'TrackStartError') {
+      return 'The camera is already in use by another app. Close it and try again.';
+    }
+    if (name === 'OverconstrainedError') {
+      return 'This camera could not be opened with the requested settings. Trying another camera.';
+    }
+    return err?.message || 'Could not start the camera.';
+  };
+
+  const requestCamera = async (facingMode: 'environment' | 'user') => {
+    if (!navigator.mediaDevices?.getUserMedia) {
+      throw new Error('This browser cannot open the camera. Use Safari, Chrome, or Edge.');
+    }
+
+    const attempts: MediaStreamConstraints[] = [
+      { audio: false, video: { facingMode: { ideal: facingMode } } },
+      { audio: false, video: { facingMode } },
+      { audio: false, video: true },
+    ];
+
+    let lastError: any;
+    for (const constraints of attempts) {
+      try {
+        return await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err: any) {
+        lastError = err;
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') {
+          throw err;
+        }
+      }
+    }
+    throw lastError || new Error('Could not start the camera.');
+  };
+
+  const attachStream = async (stream: MediaStream) => {
+    const video = videoRef.current;
+    if (!video) throw new Error('Video element not found');
+
+    video.srcObject = stream;
+    video.muted = true;
+    video.defaultMuted = true;
+    video.playsInline = true;
+    video.setAttribute('playsinline', 'true');
+    video.setAttribute('webkit-playsinline', 'true');
+    video.setAttribute('autoplay', 'true');
+    video.setAttribute('muted', 'true');
+
+    const ready = new Promise<void>((resolve) => {
+      if (video.readyState >= 1 && video.videoWidth > 0) {
+        resolve();
+        return;
+      }
+      const done = () => {
+        video.removeEventListener('loadedmetadata', done);
+        resolve();
+      };
+      video.addEventListener('loadedmetadata', done, { once: true });
+    });
+
+    const playPromise = video.play();
+    await Promise.race([
+      ready,
+      playPromise.catch(() => undefined),
+      new Promise((resolve) => window.setTimeout(resolve, 4000)),
+    ]);
+    await playPromise.catch(async () => {
+      await video.play();
+    });
+
+    if (!video.videoWidth) {
+      await new Promise((resolve) => window.setTimeout(resolve, 300));
+    }
+  };
+
+  const startScanning = async (preferredFacing: 'environment' | 'user' = facingRef.current) => {
     setError('');
-    console.log('Starting camera...');
+    setStarting(true);
 
     try {
-      // Stop any existing stream
       if (streamRef.current) {
         streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
 
-      console.log('Requesting camera access...');
-      
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'environment',
-          width: { ideal: 1280 },
-          height: { ideal: 720 }
-        },
-        audio: false
-      });
-
-      console.log('Stream obtained:', stream.active);
-      streamRef.current = stream;
-
-      if (!videoRef.current) {
-        setError('Video element not found');
-        return;
+      let stream: MediaStream;
+      try {
+        stream = await requestCamera(preferredFacing);
+      } catch (err: any) {
+        if (err?.name === 'NotAllowedError' || err?.name === 'PermissionDeniedError') throw err;
+        const fallback = preferredFacing === 'environment' ? 'user' : 'environment';
+        stream = await requestCamera(fallback);
+        facingRef.current = fallback;
+        setFacing(fallback);
       }
 
-      const video = videoRef.current;
-      video.srcObject = stream;
-      video.setAttribute('playsinline', 'true');
-      video.setAttribute('autoplay', 'true');
-      video.setAttribute('muted', 'true');
-
-      // Wait for the video to be ready
-      await new Promise<void>((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          reject(new Error('Video load timeout'));
-        }, 5000);
-
-        video.onloadedmetadata = () => {
-          console.log(`Video ready: ${video.videoWidth}x${video.videoHeight}`);
-          clearTimeout(timeout);
-          resolve();
-        };
-
-        video.onerror = () => {
-          clearTimeout(timeout);
-          reject(new Error('Video element error'));
-        };
-      });
-
-      await video.play();
-      console.log('Video playing!');
-      
+      streamRef.current = stream;
+      await attachStream(stream);
       setScanning(true);
+      setStarting(false);
 
-      // Start QR code scanning
+      if (scanIntervalRef.current) clearInterval(scanIntervalRef.current);
       scanIntervalRef.current = window.setInterval(() => {
         scanForQRCode();
-      }, 300);
-
+      }, 250);
     } catch (err: any) {
       console.error('Camera error:', err);
-      setError(err.message);
+      setError(cameraErrorMessage(err));
       setScanning(false);
+      setStarting(false);
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(track => track.stop());
+        streamRef.current = null;
+      }
     }
+  };
+
+  const switchCamera = async () => {
+    const next = facingRef.current === 'environment' ? 'user' : 'environment';
+    facingRef.current = next;
+    setFacing(next);
+    await startScanning(next);
   };
 
   const stopScanning = () => {
@@ -171,23 +238,37 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
     }
   };
 
-  const processQRCode = async (referenceId: string) => {
+  const extractReferenceId = (raw: string) => {
+    const value = raw.trim()
+    const fromUrl = value.match(/\/submission\/([^/?#]+)/i)?.[1]
+    return decodeURIComponent(fromUrl || value).trim()
+  }
+
+  const processQRCode = async (rawCode: string) => {
     try {
+      const referenceId = extractReferenceId(rawCode)
       console.log('Processing QR code for reference_id:', referenceId);
-      
-      // Fetch attendee by reference_id
-      const { data: attendee, error: fetchError } = await supabase
+
+      const eventNumber = Number(eventId)
+      const { data: matches, error: fetchError } = await supabase
         .from('attendees')
         .select('*')
-        .eq('reference_id', referenceId)
-        .eq('event_id', parseInt(eventId))
-        .single();
+        .ilike('reference_id', referenceId)
+        .order('id', { ascending: false })
 
-      if (fetchError || !attendee) {
-        console.error('Attendee not found:', fetchError);
+      if (fetchError) {
+        console.error('Attendee lookup failed:', fetchError);
+      }
+
+      const rows = matches || []
+      const attendee = rows.find((row: { event_id?: number | string }) => Number(row.event_id) === eventNumber) || null
+
+      if (!attendee) {
         setLastScan({
           status: 'error',
-          message: 'Attendee not found or not registered for this event',
+          message: rows.length
+            ? 'This attendee is registered for a different event'
+            : 'Attendee not found or not registered for this event',
           time: new Date()
         });
         playSound(400, 0.2);
@@ -196,14 +277,24 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
 
       console.log('Attendee found:', attendee);
 
-      // Get current date (today)
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-      const todayEpoch = today.getTime();
+      const { data: eventRow } = await supabase
+        .from('events')
+        .select('schedules')
+        .eq('id', eventNumber)
+        .maybeSingle()
 
-      // Check if already marked present today
-      const attendance = attendee.attendance || [];
-      const todayAttendance = attendance.find((a: any) => a.date === todayEpoch);
+      const scheduleDates = (Array.isArray(eventRow?.schedules) ? eventRow.schedules : [])
+        .map((item: { date?: string }) => String(item?.date || '').slice(0, 10))
+        .filter(Boolean)
+
+      const todayKey = localDateKey()
+      const targetDate =
+        scheduleDates.find((date) => date === todayKey) ||
+        (scheduleDates.length === 1 ? scheduleDates[0] : todayKey)
+      const todayEpoch = scheduleDateEpoch(targetDate)
+
+      const attendance = Array.isArray(attendee.attendance) ? attendee.attendance : []
+      const todayAttendance = attendance.find((a: any) => attendanceMatchesDate(a.date, targetDate));
 
       if (todayAttendance && todayAttendance.status === 'Present') {
         console.log('Already marked present today');
@@ -224,8 +315,7 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
         return;
       }
 
-      // Mark as present
-      const updatedAttendance = attendance.filter((a: any) => a.date !== todayEpoch);
+      const updatedAttendance = attendance.filter((a: any) => !attendanceMatchesDate(a.date, targetDate));
       updatedAttendance.push({ date: todayEpoch, status: 'Present' });
 
       console.log('Updating attendance...');
@@ -339,6 +429,8 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
                 autoPlay
                 playsInline
                 muted
+                // @ts-expect-error iOS Safari needs the legacy attribute
+                webkit-playsinline="true"
                 className="w-full h-full object-cover"
               />
               <canvas ref={canvasRef} className="hidden" />
@@ -358,7 +450,7 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
                 </>
               )}
 
-              {!scanning && (
+              {!scanning && !starting && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 p-6 bg-gray-800">
                   <Camera className="h-16 w-16 text-gray-400" />
                   <p className="text-white text-center">Click "Start Scanning" to activate camera</p>
@@ -366,23 +458,31 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
               )}
             </div>
 
-            <Button
-              onClick={scanning ? stopScanning : startScanning}
-              className="w-full"
-              variant={scanning ? 'destructive' : 'default'}
-            >
-              {scanning ? (
-                <>
-                  <XCircle className="mr-2 h-4 w-4" />
-                  Stop Scanning
-                </>
-              ) : (
-                <>
-                  <Camera className="mr-2 h-4 w-4" />
-                  Start Scanning
-                </>
+            <div className="flex gap-2">
+              <Button
+                onClick={scanning ? stopScanning : () => startScanning()}
+                className="flex-1"
+                variant={scanning ? 'destructive' : 'default'}
+              >
+                {scanning ? (
+                  <>
+                    <XCircle className="mr-2 h-4 w-4" />
+                    Stop Scanning
+                  </>
+                ) : (
+                  <>
+                    <Camera className="mr-2 h-4 w-4" />
+                    Start Scanning
+                  </>
+                )}
+              </Button>
+              {scanning && (
+                <Button type="button" variant="outline" onClick={switchCamera}>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  {facing === 'environment' ? 'Front' : 'Back'}
+                </Button>
               )}
-            </Button>
+            </div>
 
             {lastScan && (
               <Alert 

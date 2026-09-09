@@ -36,14 +36,10 @@ interface NavigationProps {
 
 export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
   const pathname = usePathname()
-  const [settingsActive, setSettingsActive] = useState(false)
   const router = useRouter()
   const onQrPage = pathname.includes("/qr-scan")
   const onMembership = pathname.startsWith("/membership")
-
-  const handleComingSoon = () => {
-    toast.info("🚧 This feature will be available soon!", { duration: 3000 })
-  }
+  const onSettings = pathname.startsWith("/settings")
 
   const handleQRScanner = () => {
     if (!currentEventId) {
@@ -105,11 +101,8 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
             <NavIcon
               icon={Settings}
               label="Settings"
-              onClick={() => {
-                handleComingSoon()
-                setSettingsActive(true)
-              }}
-              active={settingsActive}
+              onClick={() => router.push("/settings")}
+              active={onSettings}
             />
           </div>
 
@@ -124,6 +117,16 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
             </div>
 
             <NotificationBell />
+
+            <button
+              onClick={() => router.push("/settings")}
+              className={`flex h-10 w-10 items-center justify-center rounded-full transition sm:hidden ${
+                onSettings ? "bg-[#00D47E] text-[#0B1F14]" : "text-[#8D959D] hover:bg-[#F7FBF8] hover:text-[#0B1F14]"
+              }`}
+              title="Settings"
+            >
+              <Settings className="h-4 w-4" />
+            </button>
 
             <button
               onClick={handleLogout}
