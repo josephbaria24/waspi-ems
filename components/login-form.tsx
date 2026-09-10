@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase-client"
+import { persistSupabaseSession } from "@/lib/persist-supabase-session"
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import {
@@ -58,20 +59,26 @@ export function LoginForm({
     setError(null)
     setLoading(true)
 
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
+    try {
+      const response = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password }),
+      })
+      const payload = await response.json()
 
-    setLoading(false)
+      if (!response.ok) {
+        setError(payload.error || "Login failed.")
+        return
+      }
 
-    if (error) {
-      setError(error.message)
-      return
-    }
-
-    if (data?.user) {
-      router.push(redirectTo || "/events")
+      // Store tokens locally — avoid supabase.auth.setSession (it calls supabase.co from the browser).
+      persistSupabaseSession(payload.session)
+      window.location.assign(redirectTo || "/events")
+    } catch {
+      setError("Could not reach the login service. Please try again.")
+    } finally {
+      setLoading(false)
     }
   }
 

@@ -6,6 +6,7 @@ import { Settings, LogOut, Bell, Search, QrCode, Users, FileUp, UserPlus, Ticket
 import { usePathname, useRouter } from "next/navigation"
 import { toast } from "sonner"
 import { supabase } from "@/lib/supabase-client"
+import { clearSupabaseSession, getSupabaseAuthStorageKey } from "@/lib/persist-supabase-session"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 
 type NotificationItem = {
@@ -54,16 +55,34 @@ export function Navigation({ currentEventId, onQRScanClick }: NavigationProps) {
     }
   }
 
-  const handleLogout = async () => {
+  const handleLogout = () => {
+    // Always clear locally and redirect immediately — never wait on supabase.co.
+    let accessToken = ""
     try {
-      const { error } = await supabase.auth.signOut()
-      if (error) throw error
-      toast.success("👋 You've been logged out successfully.")
-      window.location.href = "/login"
-    } catch (err: any) {
-      console.error("Logout error:", err)
-      toast.error("Failed to log out. Please try again.")
+      const storageKey = getSupabaseAuthStorageKey()
+      if (storageKey) {
+        const raw = window.localStorage.getItem(storageKey)
+        if (raw) accessToken = JSON.parse(raw)?.access_token || ""
+      }
+    } catch {
+      // ignore
     }
+
+    clearSupabaseSession()
+    void supabase.auth.signOut({ scope: "local" }).catch(() => null)
+
+    if (accessToken) {
+      const controller = new AbortController()
+      window.setTimeout(() => controller.abort(), 1500)
+      void fetch("/api/auth/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ access_token: accessToken }),
+        signal: controller.signal,
+      }).catch(() => null)
+    }
+
+    window.location.replace("/login")
   }
 
   return (
