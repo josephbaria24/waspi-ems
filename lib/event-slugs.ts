@@ -37,3 +37,18 @@ export function normalizeSlugList(values: unknown): string[] {
   }
   return list
 }
+
+/** PostgREST needs a JSON value for jsonb `cs` — a JS array can be sent as `{slug}` and fail. */
+export function aliasesContainsFilter(slug: string) {
+  return JSON.stringify([normalizeRegistrationSlug(slug)])
+}
+
+export function eventHasSlug(
+  event: { magic_link?: string | null; magic_link_aliases?: unknown },
+  slug: string,
+) {
+  const normalized = normalizeRegistrationSlug(slug)
+  if (!normalized) return false
+  if (normalizeRegistrationSlug(String(event.magic_link || "")) === normalized) return true
+  return normalizeSlugList(event.magic_link_aliases).includes(normalized)
+}

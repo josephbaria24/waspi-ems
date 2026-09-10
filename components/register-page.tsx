@@ -12,6 +12,7 @@ import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, CheckCircle2, Upload, Edit2, X, Crop, UserCog } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
+import { aliasesContainsFilter, eventHasSlug, normalizeRegistrationSlug } from "@/lib/event-slugs"
 
 interface CropArea {
   x: number
@@ -95,13 +96,23 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
         .maybeSingle()
 
       if (!data) {
+        const aliasSlug = normalizeRegistrationSlug(String(ref))
         const byAlias = await supabase
           .from("events")
-          .select(selectCols)
-          .contains("magic_link_aliases", [String(ref).toLowerCase()])
+          .select(`${selectCols}, magic_link, magic_link_aliases`)
+          .filter("magic_link_aliases", "cs", aliasesContainsFilter(aliasSlug))
           .maybeSingle()
-        data = byAlias.data
-        error = byAlias.error || error
+
+        if (byAlias.data) {
+          data = byAlias.data
+        } else {
+          const { data: rows } = await supabase
+            .from("events")
+            .select(`${selectCols}, magic_link, magic_link_aliases`)
+            .limit(500)
+          data = (rows || []).find((row) => eventHasSlug(row, aliasSlug)) || null
+          error = byAlias.error || error
+        }
       }
 
       if (error && !data) {

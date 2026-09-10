@@ -1,7 +1,12 @@
 import { notFound } from "next/navigation"
 import { Suspense } from "react"
 import EventRegisterPage from "@/components/register-page"
-import { RESERVED_EVENT_SLUGS, normalizeRegistrationSlug } from "@/lib/event-slugs"
+import {
+  RESERVED_EVENT_SLUGS,
+  aliasesContainsFilter,
+  eventHasSlug,
+  normalizeRegistrationSlug,
+} from "@/lib/event-slugs"
 import { supabaseServer } from "@/lib/supabase-server"
 
 async function findEventBySlug(slug: string) {
@@ -16,16 +21,22 @@ async function findEventBySlug(slug: string) {
   const { data: byAlias, error } = await supabaseServer
     .from("events")
     .select("id, magic_link, magic_link_aliases")
-    .contains("magic_link_aliases", [slug])
+    .filter("magic_link_aliases", "cs", aliasesContainsFilter(slug))
     .maybeSingle()
 
+  if (byAlias?.magic_link) return byAlias
+
   if (error) {
-    // Column may not exist yet — ignore and treat as not found.
     console.error("Alias slug lookup error:", error.message)
-    return null
   }
 
-  return byAlias
+  // Fallback when jsonb `cs` filter fails — match aliases in app code.
+  const { data: rows } = await supabaseServer
+    .from("events")
+    .select("id, magic_link, magic_link_aliases")
+    .limit(500)
+
+  return (rows || []).find((row) => eventHasSlug(row, slug)) || null
 }
 
 export default async function EventSlugPage({
