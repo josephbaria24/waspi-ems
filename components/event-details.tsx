@@ -97,6 +97,7 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: ()
         attendees: stats, // Now using stats object instead of single number
         createdAt: data.created_at,
         magic_link: data.magic_link,
+        magic_link_aliases: Array.isArray(data.magic_link_aliases) ? data.magic_link_aliases : [],
         start_date: data.start_date,
         end_date: data.end_date,
       })

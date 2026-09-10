@@ -11,6 +11,7 @@ export type Event = {
   attendees: number // This can be a single number for backwards compatibility
   createdAt: string
   magic_link?: string
+  magic_link_aliases?: string[]
   start_date?: string
   end_date?: string
   status?: string

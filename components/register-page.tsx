@@ -86,13 +86,25 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
         return
       }
 
-      const { data, error } = await supabase
-        .from("events")
-        .select("id, name, price, venue, start_date, end_date, feature_image, description")
-        .eq("magic_link", ref)
-        .single()
+      const selectCols = "id, name, price, venue, start_date, end_date, feature_image, description"
 
-      if (error) {
+      let { data, error } = await supabase
+        .from("events")
+        .select(selectCols)
+        .eq("magic_link", ref)
+        .maybeSingle()
+
+      if (!data) {
+        const byAlias = await supabase
+          .from("events")
+          .select(selectCols)
+          .contains("magic_link_aliases", [String(ref).toLowerCase()])
+          .maybeSingle()
+        data = byAlias.data
+        error = byAlias.error || error
+      }
+
+      if (error && !data) {
         console.error(error)
         toast({
           variant: "destructive",

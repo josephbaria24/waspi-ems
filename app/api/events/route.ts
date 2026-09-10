@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server"
+import { normalizeRegistrationSlug, normalizeSlugList, RESERVED_EVENT_SLUGS } from "@/lib/event-slugs"
 import { supabaseServer } from "@/lib/supabase-server"
 
 async function saveCoverImage(eventId: number, coverImage: string) {
@@ -27,26 +28,6 @@ async function saveCoverImage(eventId: number, coverImage: string) {
 
 function makeMagicLink() {
   return `evt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
-}
-
-const RESERVED_SLUGS = new Set([
-  "api",
-  "events",
-  "login",
-  "register",
-  "membership",
-  "settings",
-  "submission",
-  "evaluation",
-])
-
-function normalizeRegistrationSlug(value: string) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80)
 }
 
 async function nextEventId() {
@@ -166,6 +147,8 @@ export async function PUT(request: Request) {
     const description = String(body.description || "").trim()
     const schedule = Array.isArray(body.schedule) ? body.schedule : []
     const magicLink = normalizeRegistrationSlug(String(body.magic_link || body.registration_slug || ""))
+    const aliases = normalizeSlugList(body.magic_link_aliases || body.registration_aliases)
+      .filter((slug) => slug !== magicLink)
 
     if (!id || !name || !venue) {
       return NextResponse.json({ error: "Event name and venue are required." }, { status: 400 })
@@ -179,19 +162,29 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "Registration slug must be at least 3 characters." }, { status: 400 })
     }
 
-    if (RESERVED_SLUGS.has(magicLink)) {
-      return NextResponse.json({ error: "That slug is reserved. Choose another registration slug." }, { status: 400 })
+    const allSlugs = [magicLink, ...aliases]
+    if (allSlugs.some((slug) => RESERVED_EVENT_SLUGS.has(slug))) {
+      return NextResponse.json({ error: "One of the slugs is reserved. Choose another." }, { status: 400 })
     }
 
-    const { data: slugOwner } = await supabaseServer
+    const { data: existingEvents, error: existingError } = await supabaseServer
       .from("events")
-      .select("id")
-      .eq("magic_link", magicLink)
+      .select("id, magic_link, magic_link_aliases")
       .neq("id", id)
-      .maybeSingle()
 
-    if (slugOwner) {
-      return NextResponse.json({ error: "That registration slug is already used by another event." }, { status: 400 })
+    if (existingError && !existingError.message.toLowerCase().includes("magic_link_aliases")) {
+      return NextResponse.json({ error: existingError.message }, { status: 500 })
+    }
+
+    const taken = new Set<string>()
+    for (const row of existingEvents || []) {
+      if (row.magic_link) taken.add(String(row.magic_link).toLowerCase())
+      for (const alias of normalizeSlugList(row.magic_link_aliases)) taken.add(alias)
+    }
+
+    const conflict = allSlugs.find((slug) => taken.has(slug))
+    if (conflict) {
+      return NextResponse.json({ error: `Slug "${conflict}" is already used by another event.` }, { status: 400 })
     }
 
     const dates = schedule
@@ -204,25 +197,46 @@ export async function PUT(request: Request) {
     const endDate = dates[dates.length - 1] ? new Date(dates[dates.length - 1]).toISOString() : startDate
     const featureImage = await saveCoverImage(id, typeof body.feature_image === "string" ? body.feature_image : "")
 
-    const { data, error } = await supabaseServer
+    const updatePayload: Record<string, unknown> = {
+      name,
+      type,
+      price,
+      venue,
+      description,
+      schedules: schedule,
+      topics,
+      start_date: startDate,
+      end_date: endDate,
+      feature_image: featureImage,
+      magic_link: magicLink,
+      magic_link_aliases: aliases,
+      updated_at: new Date().toISOString(),
+    }
+
+    let { data, error } = await supabaseServer
       .from("events")
-      .update({
-        name,
-        type,
-        price,
-        venue,
-        description,
-        schedules: schedule,
-        topics,
-        start_date: startDate,
-        end_date: endDate,
-        feature_image: featureImage,
-        magic_link: magicLink,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq("id", id)
       .select("*")
       .single()
+
+    if (error && error.message.toLowerCase().includes("magic_link_aliases")) {
+      delete updatePayload.magic_link_aliases
+      const retry = await supabaseServer
+        .from("events")
+        .update(updatePayload)
+        .eq("id", id)
+        .select("*")
+        .single()
+      data = retry.data
+      error = retry.error
+      if (!error) {
+        return NextResponse.json({
+          event: data,
+          warning: "Extra slugs need a database column. Run: alter table events add column if not exists magic_link_aliases jsonb default '[]'::jsonb;",
+        })
+      }
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

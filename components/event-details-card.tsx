@@ -16,6 +16,7 @@ import SendDirectCertificateModal from "@/components/send-direct-certificate-mod
 import AddAttendeeModal from "@/components/add-attendee-modal"
 import { supabase } from "@/lib/supabase-client"
 import { EventCoverCrop } from "@/components/event-cover-crop"
+import { normalizeRegistrationSlug, normalizeSlugList, registrationPath } from "@/lib/event-slugs"
 
 const EVENT_TYPES = [
   { value: "Conference", label: "Conference", icon: Users, tint: "bg-emerald-50 text-emerald-700" },
@@ -26,20 +27,6 @@ const EVENT_TYPES = [
 
 function dateInputValue(value?: string) {
   return value ? value.slice(0, 10) : ""
-}
-
-function normalizeRegistrationSlug(value: string) {
-  return String(value || "")
-    .trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 80)
-}
-
-function registrationPath(slug?: string) {
-  if (!slug) return ""
-  return `/${encodeURIComponent(slug)}`
 }
 
 // Extended Event type with stats
@@ -58,6 +45,8 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
   const [priceInput, setPriceInput] = useState(event.price ? String(event.price) : "")
   const [coverImage, setCoverImage] = useState(event.feature_image || "")
   const [registrationSlug, setRegistrationSlug] = useState(event.magic_link || "")
+  const [slugAliases, setSlugAliases] = useState<string[]>(normalizeSlugList(event.magic_link_aliases))
+  const [aliasInput, setAliasInput] = useState("")
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -66,6 +55,8 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
       setCoverImage(event.feature_image || "")
       setPriceInput(event.price ? String(event.price) : "")
       setRegistrationSlug(event.magic_link || "")
+      setSlugAliases(normalizeSlugList(event.magic_link_aliases))
+      setAliasInput("")
     }
   }, [event, isEditing])
 
@@ -74,6 +65,8 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
     setCoverImage(event.feature_image || "")
     setPriceInput(event.price ? String(event.price) : "")
     setRegistrationSlug(event.magic_link || "")
+    setSlugAliases(normalizeSlugList(event.magic_link_aliases))
+    setAliasInput("")
     setTopicInput("")
     setIsEditing(true)
   }
@@ -83,8 +76,22 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
     setCoverImage(event.feature_image || "")
     setPriceInput(event.price ? String(event.price) : "")
     setRegistrationSlug(event.magic_link || "")
+    setSlugAliases(normalizeSlugList(event.magic_link_aliases))
+    setAliasInput("")
     setTopicInput("")
     setIsEditing(false)
+  }
+
+  const addAlias = () => {
+    const next = normalizeRegistrationSlug(aliasInput)
+    const primary = normalizeRegistrationSlug(registrationSlug)
+    if (!next || next.length < 3) return
+    if (next === primary || slugAliases.includes(next)) {
+      setAliasInput("")
+      return
+    }
+    setSlugAliases([...slugAliases, next])
+    setAliasInput("")
   }
 
   const handleSave = async () => {
@@ -114,13 +121,18 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
           schedule: editedEvent.schedule,
           feature_image: coverImage,
           magic_link: slug,
+          magic_link_aliases: slugAliases.filter((alias) => alias !== slug),
         }),
       })
       const payload = await response.json()
       if (!response.ok) {
         throw new Error(payload.error || "Failed to save changes")
       }
+      if (payload.warning) {
+        alert(payload.warning)
+      }
       setRegistrationSlug(slug)
+      setSlugAliases(normalizeSlugList(payload.event?.magic_link_aliases || slugAliases))
       setIsEditing(false)
       onUpdated?.()
     } catch (error) {
@@ -304,7 +316,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
 
               <div>
                 <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
-                  Registration slug
+                  Primary registration slug
                 </label>
                 <div className="overflow-hidden rounded-xl border border-[#E8EAEB] bg-white focus-within:border-[#00D47E] focus-within:ring-2 focus-within:ring-[#00D47E]/20">
                   <p className="border-b border-[#E8EAEB] bg-[#F7FBF8] px-3 py-2 font-mono text-[11px] text-[#8D959D]">
@@ -315,13 +327,61 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                     value={registrationSlug}
                     onChange={(e) => setRegistrationSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
                     onBlur={() => setRegistrationSlug(normalizeRegistrationSlug(registrationSlug))}
-                    placeholder="oshe-8th-convention"
+                    placeholder="natcon26"
                     className="w-full bg-transparent px-3 py-2.5 font-mono text-sm text-[#1E1E1E] outline-none"
                   />
                 </div>
                 <p className="mt-1.5 break-all text-xs text-[#8D959D]">
                   Public link: waspi.ph{registrationPath(normalizeRegistrationSlug(registrationSlug) || "natcon26")}
                 </p>
+
+                <label className="mb-2 mt-4 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
+                  Extra slug links
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={aliasInput}
+                    onChange={(e) => setAliasInput(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        addAlias()
+                      }
+                    }}
+                    placeholder="natcon2026"
+                    className={fieldClass}
+                  />
+                  <Button
+                    type="button"
+                    onClick={addAlias}
+                    className="h-11 rounded-xl bg-[#0B1F14] px-4 text-white hover:bg-[#0B1F14]/90"
+                  >
+                    Add
+                  </Button>
+                </div>
+                <p className="mt-1.5 text-xs text-[#8D959D]">
+                  Add alternate links for social posts or emails. They all open this same event.
+                </p>
+                {slugAliases.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    {slugAliases.map((alias) => (
+                      <span
+                        key={alias}
+                        className="inline-flex items-center gap-1 rounded-full bg-[#00D47E]/15 px-3 py-1 text-sm font-medium text-[#0B1F14]"
+                      >
+                        waspi.ph/{alias}
+                        <button
+                          type="button"
+                          onClick={() => setSlugAliases(slugAliases.filter((item) => item !== alias))}
+                          aria-label={`Remove ${alias}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div className="space-y-3 rounded-2xl border border-[#E8EAEB] bg-white p-3">
@@ -542,32 +602,39 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
               <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
                 <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">
                   <Link2 className="h-3.5 w-3.5 text-[#017C7C]" />
-                  Registration link
+                  Registration links
                 </p>
                 {editedEvent.magic_link ? (
-                  <div className="mt-2 flex items-start gap-2">
-                    <a
-                      href={registrationPath(editedEvent.magic_link)}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="min-w-0 flex-1 break-all font-mono text-sm font-semibold text-[#017C7C] hover:underline"
-                    >
-                      waspi.ph{registrationPath(editedEvent.magic_link)}
-                    </a>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      className="h-8 shrink-0 rounded-full border-[#E8EAEB] px-2.5"
-                      onClick={async () => {
-                        const path = registrationPath(editedEvent.magic_link)
-                        const full = `${window.location.origin}${path}`
-                        await navigator.clipboard.writeText(full)
-                        alert("Registration link copied")
-                      }}
-                    >
-                      <Copy className="h-3.5 w-3.5" />
-                    </Button>
+                  <div className="mt-2 space-y-2">
+                    {[editedEvent.magic_link, ...normalizeSlugList(editedEvent.magic_link_aliases)].map((slug, index) => (
+                      <div key={slug} className="flex items-start gap-2">
+                        <div className="min-w-0 flex-1">
+                          {index === 0 && <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8D959D]">Primary</p>}
+                          {index > 0 && <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8D959D]">Extra</p>}
+                          <a
+                            href={registrationPath(slug)}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="break-all font-mono text-sm font-semibold text-[#017C7C] hover:underline"
+                          >
+                            waspi.ph{registrationPath(slug)}
+                          </a>
+                        </div>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          className="h-8 shrink-0 rounded-full border-[#E8EAEB] px-2.5"
+                          onClick={async () => {
+                            const full = `${window.location.origin}${registrationPath(slug)}`
+                            await navigator.clipboard.writeText(full)
+                            alert("Registration link copied")
+                          }}
+                        >
+                          <Copy className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
                   </div>
                 ) : (
                   <p className="mt-1 text-sm text-[#8D959D]">No registration slug yet. Edit the event to set one.</p>
