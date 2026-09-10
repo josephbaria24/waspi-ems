@@ -31,7 +31,7 @@ interface EventData {
   description?: string
 }
 
-export default function RegisterPage() {
+export default function RegisterPage({ eventRef }: { eventRef?: string }) {
   const [event, setEvent] = useState<EventData | null>(null)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
@@ -68,7 +68,7 @@ export default function RegisterPage() {
   })
 
   const searchParams = useSearchParams()
-  const ref = searchParams.get("ref")
+  const ref = eventRef || searchParams.get("ref")
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -447,10 +447,10 @@ export default function RegisterPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#017C7C]/90">
-        <Card className="w-full max-w-md">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBF8]">
+        <Card className="w-full max-w-md rounded-3xl border border-[#E8EAEB] bg-white shadow-sm">
           <CardContent className="flex items-center justify-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+            <Loader2 className="h-8 w-8 animate-spin text-[#00D47E]" />
           </CardContent>
         </Card>
       </main>
@@ -459,11 +459,11 @@ export default function RegisterPage() {
 
   if (!event) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#017C7C]/90 p-4">
-        <Card className="w-full max-w-md">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBF8] p-4">
+        <Card className="w-full max-w-md rounded-3xl border border-[#E8EAEB] bg-white shadow-sm">
           <CardHeader>
-            <CardTitle className="text-destructive">Invalid Event Link</CardTitle>
-            <CardDescription>
+            <CardTitle className="text-[#1E1E1E]">Invalid Event Link</CardTitle>
+            <CardDescription className="text-[#8D959D]">
               The registration link you're trying to access is invalid or has expired.
             </CardDescription>
           </CardHeader>
@@ -474,23 +474,23 @@ export default function RegisterPage() {
 
   if (submitted) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[#017C7C]/90 p-4">
-        <Card className="w-full max-w-md">
+      <main className="flex min-h-screen items-center justify-center bg-[#F7FBF8] p-4">
+        <Card className="w-full max-w-md rounded-3xl border border-[#E8EAEB] bg-white shadow-sm">
           <CardContent className="pt-6">
             <div className="flex flex-col items-center space-y-6 text-center">
-              <div className="rounded-full bg-green-500 p-6">
-                <CheckCircle2 className="h-16 w-16 text-white" />
+              <div className="rounded-full bg-[#00D47E] p-6 text-[#0B1F14]">
+                <CheckCircle2 className="h-16 w-16" />
               </div>
 
               <div className="space-y-2">
-                <h2 className="text-3xl font-bold text-foreground">Great!</h2>
-                <p className="text-muted-foreground">
+                <h2 className="text-3xl font-semibold text-[#0B1F14]">Great!</h2>
+                <p className="text-[#8D959D]">
                   Your submission has been sent.
                 </p>
-                <p className="text-muted-foreground">
+                <p className="text-[#8D959D]">
                   Please check your email for more details.
                 </p>
-                <p className="text-muted-foreground">
+                <p className="text-[#8D959D]">
                   We'll see you soon!
                 </p>
               </div>
@@ -513,7 +513,7 @@ export default function RegisterPage() {
                   })
                 }}
                 variant="outline"
-                className="mt-4"
+                className="mt-4 h-11 rounded-full border-[#E8EAEB] text-[#0B1F14] hover:bg-[#F7FBF8]"
               >
                 Register Another Attendee
               </Button>
@@ -525,13 +525,13 @@ export default function RegisterPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-emerald-500 p-4 sm:p-8">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-[#F7FBF8] p-4 sm:p-8">
       {showCropModal && imageToCrop && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-          <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto">
+        <div className="fixed inset-0 z-50 bg-[#0B1F14]/80 flex items-center justify-center p-4">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-auto rounded-3xl border border-[#E8EAEB] bg-white shadow-sm">
             <CardHeader>
-              <CardTitle>Crop Image to 1200x628</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-[#0B1F14]">Crop Image to 1200x628</CardTitle>
+              <CardDescription className="text-[#8D959D]">
                 Drag the highlighted area to adjust the crop. The image will be resized to 1200x628 pixels.
               </CardDescription>
             </CardHeader>
@@ -545,7 +545,7 @@ export default function RegisterPage() {
                   draggable={false}
                 />
                 <div
-                  className="absolute border-4 border-blue-500 bg-blue-500/20 cursor-move"
+                  className="absolute border-4 border-[#00D47E] bg-[#00D47E]/20 cursor-move"
                   style={{
                     left: cropImageRef.current ? `${(cropArea.x / cropImageRef.current.naturalWidth) * 100}%` : '0%',
                     top: cropImageRef.current ? `${(cropArea.y / cropImageRef.current.naturalHeight) * 100}%` : '0%',
@@ -571,7 +571,7 @@ export default function RegisterPage() {
                 <Button
                   onClick={handleCropConfirm}
                   disabled={uploading}
-                  className="bg-green-600 hover:bg-green-700"
+                  className="rounded-full bg-[#00D47E] font-semibold text-[#0B1F14] hover:bg-[#00c174]"
                 >
                   {uploading ? (
                     <>
@@ -592,20 +592,20 @@ export default function RegisterPage() {
       )}
 
       {isAdmin && (
-        <div className="w-full max-w-2xl mb-4 bg-yellow-500 border-2 text-black px-4 py-2 rounded-lg flex items-center justify-between">
-          <span className="font-semibold flex gap-2"><UserCog /> Admin Mode</span>
+        <div className="mb-4 flex w-full max-w-2xl items-center justify-between rounded-2xl border border-[#00D47E]/40 bg-[#00D47E]/15 px-4 py-2 text-[#0B1F14]">
+          <span className="flex gap-2 font-semibold"><UserCog /> Admin Mode</span>
         </div>
       )}
 
-      <Card className="w-full max-w-2xl">
+      <Card className="w-full max-w-2xl overflow-hidden rounded-3xl border border-[#E8EAEB] bg-white shadow-sm">
         {(event.feature_image || (isAdmin && editMode)) && (
           <div className="relative">
             {event.feature_image ? (
-              <div className="relative w-full h-[314px] overflow-hidden rounded-t-lg">
+              <div className="relative aspect-[1200/628] w-full overflow-hidden bg-[#F7FBF8]">
                 <img
                   src={event.feature_image}
                   alt={event.name}
-                  className="w-full h-full object-cover"
+                  className="h-full w-full object-contain sm:object-cover"
                 />
                 {isAdmin && editMode && (
                   <div className="absolute top-2 right-2 flex gap-2">
@@ -638,7 +638,7 @@ export default function RegisterPage() {
             ) : (
               isAdmin && editMode && (
                 <div
-                  className="w-full h-[314px] border-2 border-dashed border-gray-300 rounded-t-lg flex flex-col items-center justify-center cursor-pointer hover:border-gray-400 transition-colors"
+                  className="flex aspect-[1200/628] w-full cursor-pointer flex-col items-center justify-center border-b border-dashed border-[#CDEEDD] bg-[#F7FBF8] transition-colors hover:border-[#00D47E]"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   {uploading ? (
@@ -663,44 +663,45 @@ export default function RegisterPage() {
           </div>
         )}
 
-        <CardHeader>
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <CardTitle className="text-3xl">{event.name}</CardTitle>
+        <div className="relative overflow-hidden bg-[#0B1F14] px-6 py-6 text-white">
+          <div className="pointer-events-none absolute -right-8 -top-10 h-28 w-32 rounded-full bg-[#00D47E]/25" />
+          <div className="pointer-events-none absolute -bottom-12 left-1/3 h-24 w-40 rounded-full bg-[#017C7C]/40" />
+          <div className="relative flex items-start justify-between gap-4">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs uppercase tracking-[0.18em] text-white/70">Event registration</p>
+              <CardTitle className="mt-2 text-2xl font-semibold text-white sm:text-3xl">{event.name}</CardTitle>
               {event.description && (
-                <p className="text-base text-muted-foreground mt-2 whitespace-pre-wrap">
+                <p className="mt-2 whitespace-pre-wrap text-sm text-white/75">
                   {event.description}
                 </p>
               )}
-              <div className="flex items-center justify-between text-sm text-muted-foreground pt-2">
+              <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/75">
                 <p>
                   {new Date(event.start_date).toLocaleDateString()} –{" "}
                   {new Date(event.end_date).toLocaleDateString()}
                 </p>
-                <p className="font-semibold">₱{Number(event.price).toLocaleString()}</p>
+                <p className="font-semibold text-[#00D47E]">₱{Number(event.price).toLocaleString()}</p>
+                <p>{event.venue}</p>
               </div>
-              <CardDescription className="text-base">{event.venue}</CardDescription>
             </div>
             {isAdmin && (
               <Button
                 size="sm"
                 variant="outline"
                 onClick={() => setEditMode(!editMode)}
-                className="ml-4"
+                className="rounded-full border-white/20 bg-white/10 text-white hover:bg-white/15 hover:text-white"
               >
-                <Edit2 className="h-4 w-4 mr-1" />
+                <Edit2 className="mr-1 h-4 w-4" />
                 {editMode ? "Done" : "Edit"}
               </Button>
             )}
           </div>
-        </CardHeader>
+        </div>
 
-        <Separator />
-
-        <CardContent className="pt-6">
+        <CardContent className="space-y-6 px-6 py-6">
           <form onSubmit={handleSubmit} className="space-y-6">
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Personal Details</h2>
+              <h2 className="text-lg font-semibold text-[#0B1F14]">Personal Details</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
@@ -804,7 +805,7 @@ export default function RegisterPage() {
             <Separator />
 
             <div className="space-y-4">
-              <h2 className="text-lg font-semibold">Employment Details (Optional)</h2>
+              <h2 className="text-lg font-semibold text-[#0B1F14]">Employment Details (Optional)</h2>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
@@ -863,7 +864,7 @@ export default function RegisterPage() {
 
             <Button
               type="submit"
-              className="w-full bg-green-600 hover:bg-green-700"
+              className="h-12 w-full rounded-full bg-[#00D47E] text-base font-semibold text-[#0B1F14] hover:bg-[#00c174]"
               size="lg"
               disabled={submitting || !dataPrivacyAgreed}
             >

@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, type CSSProperties, type ReactNode, 
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { cn } from '@/lib/utils';
+import { useIsMobileClient } from '@/hooks/use-is-mobile-client';
 
 gsap.registerPlugin(ScrollTrigger);
 
@@ -35,6 +36,7 @@ const ScrollFloat: React.FC<ScrollFloatProps> = ({
   textStyle
 }) => {
   const containerRef = useRef<HTMLHeadingElement>(null);
+  const isMobile = useIsMobileClient();
 
   const splitText = useMemo(() => {
     const text = typeof children === 'string' ? children : '';
@@ -46,14 +48,14 @@ const ScrollFloat: React.FC<ScrollFloatProps> = ({
   }, [children, charClassName]);
 
   useEffect(() => {
+    if (isMobile) return;
     const el = containerRef.current;
     if (!el) return;
 
     const scroller = scrollContainerRef && scrollContainerRef.current ? scrollContainerRef.current : window;
-
     const charElements = el.querySelectorAll('.inline-block');
 
-    gsap.fromTo(
+    const tween = gsap.fromTo(
       charElements,
       {
         willChange: 'opacity, transform',
@@ -80,7 +82,12 @@ const ScrollFloat: React.FC<ScrollFloatProps> = ({
         }
       }
     );
-  }, [scrollContainerRef, animationDuration, ease, scrollStart, scrollEnd, stagger]);
+
+    return () => {
+      tween.scrollTrigger?.kill();
+      tween.kill();
+    };
+  }, [isMobile, scrollContainerRef, animationDuration, ease, scrollStart, scrollEnd, stagger]);
 
   const sizeClasses = textStyle
     ? 'leading-[0.9]'
@@ -89,7 +96,11 @@ const ScrollFloat: React.FC<ScrollFloatProps> = ({
   return (
     <h2 ref={containerRef} className={cn('my-5 overflow-hidden', containerClassName)}>
       <span className={`inline-block ${sizeClasses} ${textClassName}`} style={textStyle}>
-        {splitText}
+        {isMobile ? (
+          <span className={cn(charClassName)}>{typeof children === 'string' ? children : null}</span>
+        ) : (
+          splitText
+        )}
       </span>
     </h2>
   );

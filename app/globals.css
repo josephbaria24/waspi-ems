@@ -164,6 +164,47 @@ input[type="submit"] {
   -webkit-text-fill-color: transparent;
 }
 
+@media (max-width: 767px) {
+  .waspi-grain-char {
+    color: #0a0a0a;
+    background-image: none;
+    -webkit-text-fill-color: #0a0a0a;
+  }
+
+  .dot-grid-bg {
+    background-image: none;
+  }
+
+  .dot-grid-bg.keep-dots {
+    background-image: radial-gradient(circle, var(--dot-color) var(--dot-size), transparent var(--dot-size));
+  }
+
+  #about,
+  #mission,
+  #benefits,
+  #contact {
+    content-visibility: auto;
+    contain-intrinsic-size: 1px 720px;
+  }
+}
+
+@keyframes waspi-marquee {
+  from { transform: translate3d(0, 0, 0); }
+  to { transform: translate3d(-33.333%, 0, 0); }
+}
+
+@keyframes waspi-marquee-reverse {
+  from { transform: translate3d(-33.333%, 0, 0); }
+  to { transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .waspi-marquee,
+  [style*="waspi-marquee"] {
+    animation: none !important;
+  }
+}
+
 .nav-glass-frost {
   background: rgba(255, 255, 255, 0.94) !important;
   backdrop-filter: blur(24px) saturate(180%) !important;

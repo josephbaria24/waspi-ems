@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus, BookOpen, GraduationCap, Video, Trash2, X } from "lucide-react"
+import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus, BookOpen, GraduationCap, Video, Trash2, X, Link2, Copy } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -28,6 +28,20 @@ function dateInputValue(value?: string) {
   return value ? value.slice(0, 10) : ""
 }
 
+function normalizeRegistrationSlug(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+}
+
+function registrationPath(slug?: string) {
+  if (!slug) return ""
+  return `/${encodeURIComponent(slug)}`
+}
+
 // Extended Event type with stats
 type EventWithStats = Omit<Event, "attendees"> & {
   attendees: {
@@ -43,6 +57,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
   const [topicInput, setTopicInput] = useState("")
   const [priceInput, setPriceInput] = useState(event.price ? String(event.price) : "")
   const [coverImage, setCoverImage] = useState(event.feature_image || "")
+  const [registrationSlug, setRegistrationSlug] = useState(event.magic_link || "")
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -50,6 +65,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
       setEditedEvent(event)
       setCoverImage(event.feature_image || "")
       setPriceInput(event.price ? String(event.price) : "")
+      setRegistrationSlug(event.magic_link || "")
     }
   }, [event, isEditing])
 
@@ -57,6 +73,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
     setEditedEvent(event)
     setCoverImage(event.feature_image || "")
     setPriceInput(event.price ? String(event.price) : "")
+    setRegistrationSlug(event.magic_link || "")
     setTopicInput("")
     setIsEditing(true)
   }
@@ -65,6 +82,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
     setEditedEvent(event)
     setCoverImage(event.feature_image || "")
     setPriceInput(event.price ? String(event.price) : "")
+    setRegistrationSlug(event.magic_link || "")
     setTopicInput("")
     setIsEditing(false)
   }
@@ -72,6 +90,12 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
   const handleSave = async () => {
     if (!editedEvent.name.trim() || !editedEvent.venue.trim()) {
       alert("Event name and venue are required.")
+      return
+    }
+
+    const slug = normalizeRegistrationSlug(registrationSlug)
+    if (!slug || slug.length < 3) {
+      alert("Enter a registration slug with at least 3 letters or numbers.")
       return
     }
 
@@ -89,12 +113,14 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
           venue: editedEvent.venue,
           schedule: editedEvent.schedule,
           feature_image: coverImage,
+          magic_link: slug,
         }),
       })
       const payload = await response.json()
       if (!response.ok) {
         throw new Error(payload.error || "Failed to save changes")
       }
+      setRegistrationSlug(slug)
       setIsEditing(false)
       onUpdated?.()
     } catch (error) {
@@ -157,7 +183,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                           alert("⚠️ This event doesn't have a registration link yet.")
                           return
                         }
-                        window.open(`/events/register?ref=${event.magic_link}`, "_blank")
+                        window.open(`/${event.magic_link}`, "_blank")
                       }
                       if (action.label === "Edit Certificate Template") {
                         setShowTemplateEditor(true)
@@ -274,6 +300,28 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                     className={fieldClass}
                   />
                 </div>
+              </div>
+
+              <div>
+                <label className="mb-2 block text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
+                  Registration slug
+                </label>
+                <div className="overflow-hidden rounded-xl border border-[#E8EAEB] bg-white focus-within:border-[#00D47E] focus-within:ring-2 focus-within:ring-[#00D47E]/20">
+                  <p className="border-b border-[#E8EAEB] bg-[#F7FBF8] px-3 py-2 font-mono text-[11px] text-[#8D959D]">
+                    waspi.ph/
+                  </p>
+                  <input
+                    type="text"
+                    value={registrationSlug}
+                    onChange={(e) => setRegistrationSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, "-"))}
+                    onBlur={() => setRegistrationSlug(normalizeRegistrationSlug(registrationSlug))}
+                    placeholder="oshe-8th-convention"
+                    className="w-full bg-transparent px-3 py-2.5 font-mono text-sm text-[#1E1E1E] outline-none"
+                  />
+                </div>
+                <p className="mt-1.5 break-all text-xs text-[#8D959D]">
+                  Public link: waspi.ph{registrationPath(normalizeRegistrationSlug(registrationSlug) || "natcon26")}
+                </p>
               </div>
 
               <div className="space-y-3 rounded-2xl border border-[#E8EAEB] bg-white p-3">
@@ -489,6 +537,41 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                   Venue
                 </p>
                 <p className="mt-1 font-semibold text-[#1E1E1E]">{editedEvent.venue}</p>
+              </div>
+
+              <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">
+                  <Link2 className="h-3.5 w-3.5 text-[#017C7C]" />
+                  Registration link
+                </p>
+                {editedEvent.magic_link ? (
+                  <div className="mt-2 flex items-start gap-2">
+                    <a
+                      href={registrationPath(editedEvent.magic_link)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="min-w-0 flex-1 break-all font-mono text-sm font-semibold text-[#017C7C] hover:underline"
+                    >
+                      waspi.ph{registrationPath(editedEvent.magic_link)}
+                    </a>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 shrink-0 rounded-full border-[#E8EAEB] px-2.5"
+                      onClick={async () => {
+                        const path = registrationPath(editedEvent.magic_link)
+                        const full = `${window.location.origin}${path}`
+                        await navigator.clipboard.writeText(full)
+                        alert("Registration link copied")
+                      }}
+                    >
+                      <Copy className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <p className="mt-1 text-sm text-[#8D959D]">No registration slug yet. Edit the event to set one.</p>
+                )}
               </div>
 
               {editedEvent.description && (

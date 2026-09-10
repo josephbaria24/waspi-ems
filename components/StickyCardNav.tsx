@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import CardNav, { type CardNavItem } from '@/components/CardNav'
+import { useIsMobileClient } from '@/hooks/use-is-mobile-client'
 
 const NAV_ITEMS: CardNavItem[] = [
   {
@@ -32,23 +33,31 @@ const NAV_ITEMS: CardNavItem[] = [
 
 export default function StickyCardNav() {
   const [visible, setVisible] = useState(true)
+  const isMobile = useIsMobileClient()
+  const lastY = useRef(0)
+  const ticking = useRef(false)
 
   useEffect(() => {
-    let lastY = window.scrollY
+    lastY.current = window.scrollY
 
     const onScroll = () => {
-      const y = window.scrollY
-      const diff = y - lastY
+      if (ticking.current) return
+      ticking.current = true
+      requestAnimationFrame(() => {
+        const y = window.scrollY
+        const diff = y - lastY.current
 
-      if (y <= 20) {
-        setVisible(true)
-      } else if (diff > 5) {
-        setVisible(false)
-      } else if (diff < -5) {
-        setVisible(true)
-      }
+        if (y <= 20) {
+          setVisible(true)
+        } else if (diff > 8) {
+          setVisible(false)
+        } else if (diff < -8) {
+          setVisible(true)
+        }
 
-      lastY = y
+        lastY.current = y
+        ticking.current = false
+      })
     }
 
     window.addEventListener('scroll', onScroll, { passive: true })
@@ -71,9 +80,9 @@ export default function StickyCardNav() {
       logoAlt="WASPI logo"
       items={NAV_ITEMS}
       className={shellClassName}
-      useGlassSurface
-      navClassName="!rounded-2xl backdrop-blur-2xl"
-      baseColor="transparent"
+      useGlassSurface={!isMobile}
+      navClassName={isMobile ? '!rounded-2xl !bg-white/95 !border !border-[#E8EAEB] !shadow-sm' : '!rounded-2xl backdrop-blur-2xl'}
+      baseColor={isMobile ? '#ffffff' : 'transparent'}
       menuColor="#1E1E1E"
       buttonBgColor="#00D47E"
       buttonTextColor="#0F1113"

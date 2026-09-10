@@ -544,6 +544,7 @@ const MagicBento: React.FC<BentoProps> = ({
   const gridRef = useRef<HTMLDivElement>(null);
   const isMobile = useMobileDetection();
   const shouldDisableAnimations = disableAnimations || isMobile;
+  const showBorderGlow = enableBorderGlow && !isMobile;
   const cards = cardsProp ?? cardData;
 
   return (
@@ -676,7 +677,7 @@ const MagicBento: React.FC<BentoProps> = ({
         `}
       </style>
 
-      {enableSpotlight && (
+      {enableSpotlight && !shouldDisableAnimations && (
         <GlobalSpotlight
           gridRef={gridRef}
           disableAnimations={shouldDisableAnimations}
@@ -691,7 +692,7 @@ const MagicBento: React.FC<BentoProps> = ({
           {cards.map((card, index) => {
             const isLightCard = !card.color || /^#f/i.test(card.color) || card.color.toLowerCase() === '#ffffff' || card.color.toLowerCase() === 'white';
             const baseClassName = `card flex flex-col justify-between relative min-h-[280px] w-full max-w-full p-5 rounded-[20px] border border-solid font-light overflow-hidden transition-colors duration-300 ease-in-out hover:-translate-y-0.5 hover:shadow-[0_8px_25px_rgba(0,0,0,0.08)] ${
-              enableBorderGlow ? 'card--border-glow' : ''
+              showBorderGlow ? 'card--border-glow' : ''
             }`;
 
             const cardStyle = {
@@ -704,7 +705,7 @@ const MagicBento: React.FC<BentoProps> = ({
               '--glow-radius': '200px'
             } as React.CSSProperties;
 
-            if (enableStars) {
+            if (enableStars && !shouldDisableAnimations) {
               return (
                 <ParticleCard
                   key={`${card.title}-${index}`}

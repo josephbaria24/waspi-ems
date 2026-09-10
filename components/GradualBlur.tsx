@@ -1,6 +1,7 @@
 'use client';
 
 import React, { CSSProperties, useEffect, useRef, useState, useMemo, PropsWithChildren } from 'react';
+import { useIsMobileClient } from '@/hooks/use-is-mobile-client';
 
 type GradualBlurProps = PropsWithChildren<{
   position?: 'top' | 'bottom' | 'left' | 'right';
@@ -167,6 +168,7 @@ const useIntersectionObserver = (ref: React.RefObject<HTMLDivElement>, shouldObs
 const GradualBlur: React.FC<GradualBlurProps> = props => {
   const containerRef = useRef<HTMLDivElement>(null) as React.RefObject<HTMLDivElement>;
   const [isHovered, setIsHovered] = useState(false);
+  const isMobile = useIsMobileClient();
 
   const config = useMemo(() => {
     const presetConfig = props.preset && PRESETS[props.preset] ? PRESETS[props.preset] : {};
@@ -263,6 +265,24 @@ const GradualBlur: React.FC<GradualBlurProps> = props => {
       return () => clearTimeout(t);
     }
   }, [isVisible, animated, onAnimationComplete, duration]);
+
+  if (isMobile) {
+    const height = responsiveHeight || config.height || '7rem';
+    const direction = getGradientDirection(config.position);
+    return (
+      <div
+        ref={containerRef}
+        className={`pointer-events-none absolute inset-x-0 z-[8] ${config.position === 'top' ? 'top-0' : 'bottom-0'} ${config.className}`}
+        style={{
+          height,
+          background: `linear-gradient(${direction}, rgba(0,0,0,0.55), transparent)`,
+          opacity: config.opacity,
+          zIndex: config.zIndex,
+          ...config.style,
+        }}
+      />
+    );
+  }
 
   return (
     <div

@@ -29,6 +29,26 @@ function makeMagicLink() {
   return `evt-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 }
 
+const RESERVED_SLUGS = new Set([
+  "api",
+  "events",
+  "login",
+  "register",
+  "membership",
+  "settings",
+  "submission",
+  "evaluation",
+])
+
+function normalizeRegistrationSlug(value: string) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 80)
+}
+
 async function nextEventId() {
   const { data, error } = await supabaseServer
     .from("events")
@@ -145,9 +165,33 @@ export async function PUT(request: Request) {
     const price = Number(body.price) || 0
     const description = String(body.description || "").trim()
     const schedule = Array.isArray(body.schedule) ? body.schedule : []
+    const magicLink = normalizeRegistrationSlug(String(body.magic_link || body.registration_slug || ""))
 
     if (!id || !name || !venue) {
       return NextResponse.json({ error: "Event name and venue are required." }, { status: 400 })
+    }
+
+    if (!magicLink) {
+      return NextResponse.json({ error: "Registration slug is required." }, { status: 400 })
+    }
+
+    if (magicLink.length < 3) {
+      return NextResponse.json({ error: "Registration slug must be at least 3 characters." }, { status: 400 })
+    }
+
+    if (RESERVED_SLUGS.has(magicLink)) {
+      return NextResponse.json({ error: "That slug is reserved. Choose another registration slug." }, { status: 400 })
+    }
+
+    const { data: slugOwner } = await supabaseServer
+      .from("events")
+      .select("id")
+      .eq("magic_link", magicLink)
+      .neq("id", id)
+      .maybeSingle()
+
+    if (slugOwner) {
+      return NextResponse.json({ error: "That registration slug is already used by another event." }, { status: 400 })
     }
 
     const dates = schedule
@@ -173,6 +217,7 @@ export async function PUT(request: Request) {
         start_date: startDate,
         end_date: endDate,
         feature_image: featureImage,
+        magic_link: magicLink,
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

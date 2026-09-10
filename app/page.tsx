@@ -82,13 +82,13 @@ const typeStyle = { fontFamily: 'Aeonik, Geist, -apple-system, BlinkMacSystemFon
 
 export default function Home() {
   return (
-    <main className="dot-grid-bg min-h-screen w-[90vw] bg-white p-0 mx-auto" style={typeStyle}>
+    <main className="dot-grid-bg mx-auto min-h-screen w-[98vw] bg-white p-0 sm:w-[90vw]" style={typeStyle}>
       <StickyCardNav />
       <div className="dot-grid-bg mx-auto w-full max-w-none overflow-hidden bg-white shadow-none">
 
-        <section className="relative min-h-[560px] px-5 pt-22 pb-12 sm:px-10 sm:pt-24 sm:pb-16 lg:px-14">
+        <section className="relative min-h-[560px] px-1 pt-22 pb-10 sm:px-10 sm:pt-24 sm:pb-16 lg:px-14">
           <BorderGlow
-            className="rounded-[32px] shadow-[0_6px_18px_rgba(0,0,0,0.14)]"
+            className="rounded-[24px] shadow-[0_6px_18px_rgba(0,0,0,0.14)] sm:rounded-[32px]"
             glowColor="145 70 58"
             borderRadius={32}
             backgroundColor="transparent"
@@ -102,7 +102,7 @@ export default function Home() {
                 fill
                 priority
                 className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1280px) 90vw, 1120px"
+                sizes="(max-width: 768px) 98vw, (max-width: 1280px) 90vw, 1120px"
               />
               <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/20" />
               <GradualBlur
@@ -117,13 +117,13 @@ export default function Home() {
                 zIndex={8}
               />
               <div className="relative z-10">
-                <div className="px-8 pb-8 pt-12 sm:px-10 sm:pt-16 lg:px-14 xl:pb-16">
-                  <div className="max-w-3xl space-y-5">
+                <div className="px-4 pb-6 pt-10 sm:px-10 sm:pb-8 sm:pt-16 lg:px-14 xl:pb-16">
+                  <div className="w-full max-w-none space-y-5 sm:max-w-3xl">
                     <p className="text-xs uppercase tracking-[0.2em] text-white/85">Workplace safety membership</p>
                     <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
                       Protecting Filipino Workers Through Unified Safety Action
                     </h1>
-                    <p className="max-w-xl text-sm leading-relaxed text-white/80 sm:text-base">
+                    <p className="w-full max-w-none text-sm leading-relaxed text-white/80 sm:max-w-xl sm:text-base">
                       A non-stock, non-profit, non-government occupational safety and health advocacy group of
                       professionals and entrepreneurs passionate about Safe Work and Safe Workplaces.
                     </p>
@@ -139,7 +139,7 @@ export default function Home() {
                       <Link href="/membership/portal">
                         <Button
                           variant="outline"
-                          className="rounded-full border-white/50 bg-transparent px-7 py-5 text-sm text-white hover:bg-white/10"
+                          className="rounded-full border-white/40 bg-white/15 px-7 py-5 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] backdrop-blur-xl backdrop-saturate-150 hover:bg-white/25 hover:text-white"
                         >
                           Member Login
                         </Button>
@@ -149,8 +149,8 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="relative z-20 px-5 pb-6 sm:px-8 xl:pointer-events-none xl:absolute xl:inset-x-auto xl:bottom-0 xl:right-0 xl:w-[min(52%,520px)] xl:px-0 xl:pb-0">
-                <div className="dot-grid-bg pointer-events-auto grid grid-cols-1 gap-4 rounded-2xl bg-white p-5 shadow-sm sm:grid-cols-3 sm:gap-5 xl:rounded-none xl:rounded-tl-[28px] xl:shadow-none">
+              <div className="relative z-20 px-3 pb-4 sm:px-8 sm:pb-6 xl:pointer-events-none xl:absolute xl:inset-x-auto xl:bottom-0 xl:right-0 xl:w-[min(52%,520px)] xl:px-0 xl:pb-0">
+                <div className="dot-grid-bg pointer-events-auto grid grid-cols-1 gap-4 rounded-2xl bg-white p-4 shadow-sm sm:grid-cols-3 sm:gap-5 sm:p-5 xl:rounded-none xl:rounded-tl-[28px] xl:shadow-none">
                   {[
                     ['1.2K+', 'Active members'],
                     ['30+', 'Partner organizations'],
@@ -182,11 +182,11 @@ export default function Home() {
               scrollStart="center bottom+=50%"
               scrollEnd="bottom bottom-=40%"
               stagger={0.03}
-              containerClassName="my-0 mb-3 w-[min(92vw,_100%)] max-w-none overflow-visible px-0 text-center md:mb-6"
+              containerClassName="my-0 mb-3 w-[min(98vw,_100%)] max-w-none overflow-visible px-0 text-center md:mb-6 md:w-[min(92vw,_100%)]"
               textClassName="font-black tracking-[-0.07em]"
               charClassName="waspi-grain-char"
               textStyle={{
-                fontSize: 'clamp(4rem, calc(92vw / 5.35), min(46vh, 38rem))',
+                fontSize: 'clamp(3rem, 18vw, min(28vh, 12rem))',
                 lineHeight: 1,
               }}
             >
@@ -199,7 +199,7 @@ export default function Home() {
           <ScrollVelocity
             texts={[MARQUEE_LINE_1, MARQUEE_LINE_2]}
             velocity={72}
-            numCopies={6}
+            numCopies={4}
             damping={50}
             stiffness={400}
             parallaxClassName="py-0.5"
@@ -210,7 +210,7 @@ export default function Home() {
 
         <LandingSection
           id="about"
-          className="scroll-mt-6 grid gap-7 px-5 pb-14 pt-8 sm:px-10 sm:pt-10 lg:grid-cols-2 lg:px-14"
+          className="scroll-mt-6 grid gap-7 px-2 pb-14 pt-8 sm:px-10 sm:pt-10 lg:grid-cols-2 lg:px-14"
         >
           <div>
             <p className="text-sm font-medium" style={{ color: palette.green }}>About WASPI</p>
@@ -247,6 +247,8 @@ export default function Home() {
               alt="WASPI officers and members"
               width={900}
               height={600}
+              loading="lazy"
+              sizes="(max-width: 1024px) 100vw, 50vw"
               className="h-full w-full object-cover"
             />
           </div>
@@ -254,7 +256,7 @@ export default function Home() {
 
         <LandingSection
           id="mission"
-          className="scroll-mt-6 bg-white px-5 py-14 sm:px-10 lg:px-14"
+          className="scroll-mt-6 bg-white px-2 py-14 sm:px-10 lg:px-14"
         >
           <div className="grid gap-5 lg:grid-cols-3">
             <article className="dot-grid-bg rounded-2xl border border-[#E8EAEB] p-6">
@@ -287,7 +289,7 @@ export default function Home() {
           </div>
         </LandingSection>
 
-        <LandingSection id="benefits" className="scroll-mt-6 bg-transparent px-5 py-14 sm:px-10 lg:px-14">
+        <LandingSection id="benefits" className="scroll-mt-6 bg-transparent px-2 py-14 sm:px-10 lg:px-14">
           <div className="max-w-3xl">
             <p className="text-sm font-medium" style={{ color: palette.green }}>Membership Benefits</p>
             <h3 className="mt-4 text-3xl font-semibold leading-tight" style={{ color: palette.dark }}>
@@ -302,19 +304,19 @@ export default function Home() {
               textAutoHide
               enableStars
               enableSpotlight
-              enableBorderGlow={true}
+              enableBorderGlow
               enableTilt={false}
               enableMagnetism
               clickEffect
               spotlightRadius={250}
-              particleCount={12}
+              particleCount={8}
               glowColor="22, 163, 92"
               disableAnimations={false}
             />
           </div>
         </LandingSection>
 
-        <LandingSection className="bg-white px-5 py-14 sm:px-10 lg:px-14">
+        <LandingSection className="bg-white px-2 py-14 sm:px-10 lg:px-14">
           <div className="max-w-3xl">
             <p className="text-sm font-medium" style={{ color: palette.green }}>Core Values</p>
             <h4 className="mt-3 text-3xl font-semibold leading-tight" style={{ color: palette.dark }}>
@@ -352,7 +354,7 @@ export default function Home() {
           </div>
         </LandingSection>
 
-        <LandingSection id="contact" className="scroll-mt-6 bg-[#1E1E1E] rounded-t-3xl px-5 py-14 text-white sm:px-10 lg:px-14">
+        <LandingSection id="contact" className="scroll-mt-6 bg-[#1E1E1E] rounded-t-3xl px-2 py-14 text-white sm:px-10 lg:px-14">
           <div className="grid gap-8 lg:grid-cols-[1.4fr_1fr] lg:items-center">
             <div>
               <p className="text-sm font-medium" style={{ color: palette.green }}>Ready to join?</p>
@@ -389,6 +391,8 @@ export default function Home() {
                 alt="WASPI community event"
                 width={700}
                 height={460}
+                loading="lazy"
+                sizes="(max-width: 1024px) 100vw, 40vw"
                 className="h-56 w-full rounded-2xl object-cover"
               />
               <p className="mt-4 text-sm text-white/75">

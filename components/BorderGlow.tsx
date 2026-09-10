@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useCallback, useState, useEffect, type ReactNode } from 'react';
+import { useIsMobileClient } from '@/hooks/use-is-mobile-client';
 
 interface BorderGlowProps {
   children?: ReactNode;
@@ -87,6 +88,7 @@ const BorderGlow: React.FC<BorderGlowProps> = ({
   fillOpacity = 0.5,
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobileClient();
   const [isHovered, setIsHovered] = useState(false);
   const [cursorAngle, setCursorAngle] = useState(45);
   const [edgeProximity, setEdgeProximity] = useState(0);
@@ -162,6 +164,21 @@ const BorderGlow: React.FC<BorderGlowProps> = ({
   const borderBg = meshGradients.map(g => `${g} border-box`);
   const fillBg = meshGradients.map(g => `${g} padding-box`);
   const angleDeg = `${cursorAngle.toFixed(3)}deg`;
+
+  if (isMobile) {
+    return (
+      <div
+        className={`relative overflow-hidden border border-white/15 ${className}`}
+        style={{
+          background: backgroundColor,
+          borderRadius: `${borderRadius}px`,
+          boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+        }}
+      >
+        {children}
+      </div>
+    );
+  }
 
   return (
     <div

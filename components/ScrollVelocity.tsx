@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef, useLayoutEffect, useState } from 'react';
+import React, { useEffect, useRef, useLayoutEffect, useState } from 'react';
 import {
   motion,
   useScroll,
@@ -10,6 +10,7 @@ import {
   useVelocity,
   useAnimationFrame
 } from 'motion/react';
+import { useIsMobileClient } from '@/hooks/use-is-mobile-client';
 
 interface VelocityMapping {
   input: [number, number];
@@ -63,6 +64,62 @@ function useElementWidth<T extends HTMLElement>(ref: React.RefObject<T | null>):
   return width;
 }
 
+function CssMarqueeRow({
+  children,
+  reverse,
+  className = '',
+  parallaxClassName,
+  scrollerClassName,
+  parallaxStyle,
+  scrollerStyle,
+}: {
+  children: React.ReactNode;
+  reverse?: boolean;
+  className?: string;
+  parallaxClassName?: string;
+  scrollerClassName?: string;
+  parallaxStyle?: React.CSSProperties;
+  scrollerStyle?: React.CSSProperties;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [paused, setPaused] = useState(false);
+
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setPaused(!entry.isIntersecting),
+      { threshold: 0.05 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
+  return (
+    <div
+      ref={rootRef}
+      className={`${parallaxClassName || ''} relative overflow-hidden`}
+      style={parallaxStyle}
+    >
+      <div
+        className={`${scrollerClassName || ''} flex w-max whitespace-nowrap text-center font-sans text-4xl font-bold tracking-[-0.02em] md:text-[5rem] md:leading-[5rem]`}
+        style={{
+          ...scrollerStyle,
+          animation: `${reverse ? 'waspi-marquee-reverse' : 'waspi-marquee'} 42s linear infinite`,
+          animationPlayState: paused ? 'paused' : 'running',
+          willChange: 'transform',
+        }}
+      >
+        {[0, 1, 2].map((i) => (
+          <span className={`flex-shrink-0 ${className}`} key={i}>
+            {children}&nbsp;
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function ScrollVelocityRow({
   children,
   baseVelocity,
@@ -77,6 +134,8 @@ function ScrollVelocityRow({
   parallaxStyle,
   scrollerStyle
 }: VelocityTextProps) {
+    const rootRef = useRef<HTMLDivElement>(null);
+    const [active, setActive] = useState(true);
     const baseX = useMotionValue(0);
     const scrollOptions = scrollContainerRef ? { container: scrollContainerRef } : {};
     const { scrollY } = useScroll(scrollOptions);
@@ -95,6 +154,17 @@ function ScrollVelocityRow({
     const copyRef = useRef<HTMLSpanElement>(null);
     const copyWidth = useElementWidth(copyRef);
 
+    useEffect(() => {
+      const el = rootRef.current;
+      if (!el) return;
+      const observer = new IntersectionObserver(
+        ([entry]) => setActive(entry.isIntersecting),
+        { threshold: 0.05, rootMargin: '80px' }
+      );
+      observer.observe(el);
+      return () => observer.disconnect();
+    }, []);
+
     function wrap(min: number, max: number, v: number): number {
       const range = max - min;
       const mod = (((v - min) % range) + range) % range;
@@ -107,7 +177,8 @@ function ScrollVelocityRow({
     });
 
     const directionFactor = useRef<number>(1);
-    useAnimationFrame((t, delta) => {
+    useAnimationFrame((_t, delta) => {
+      if (!active) return;
       let moveBy = directionFactor.current * baseVelocity * (delta / 1000);
 
       if (velocityFactor.get() < 0) {
@@ -123,7 +194,7 @@ function ScrollVelocityRow({
     const copyCount = numCopies ?? 6;
 
     return (
-      <div className={`${parallaxClassName} relative overflow-hidden`} style={parallaxStyle}>
+      <div ref={rootRef} className={`${parallaxClassName} relative overflow-hidden`} style={parallaxStyle}>
         <motion.div
           className={`${scrollerClassName} flex whitespace-nowrap text-center font-sans text-4xl font-bold tracking-[-0.02em] drop-shadow md:text-[5rem] md:leading-[5rem]`}
           style={{ x, ...scrollerStyle }}
@@ -152,6 +223,28 @@ export const ScrollVelocity: React.FC<ScrollVelocityProps> = ({
   parallaxStyle,
   scrollerStyle
 }) => {
+  const isMobile = useIsMobileClient();
+
+  if (isMobile) {
+    return (
+      <section>
+        {texts.map((text, index) => (
+          <CssMarqueeRow
+            key={`css-marquee-row-${index}`}
+            reverse={index % 2 !== 0}
+            className={className}
+            parallaxClassName={parallaxClassName}
+            scrollerClassName={scrollerClassName}
+            parallaxStyle={parallaxStyle}
+            scrollerStyle={scrollerStyle}
+          >
+            {text}
+          </CssMarqueeRow>
+        ))}
+      </section>
+    );
+  }
+
   return (
     <section>
       {texts.map((text, index) => (
