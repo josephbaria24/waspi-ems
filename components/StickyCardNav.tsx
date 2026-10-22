@@ -33,9 +33,15 @@ const NAV_ITEMS: CardNavItem[] = [
 
 export default function StickyCardNav() {
   const [visible, setVisible] = useState(true)
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [mounted, setMounted] = useState(false)
   const isMobile = useIsMobileClient()
   const lastY = useRef(0)
   const ticking = useRef(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     lastY.current = window.scrollY
@@ -47,7 +53,10 @@ export default function StickyCardNav() {
         const y = window.scrollY
         const diff = y - lastY.current
 
-        if (y <= 20) {
+        // Keep nav visible while mobile menu is open (Safari scroll-hide was eating taps)
+        if (menuOpen) {
+          setVisible(true)
+        } else if (y <= 20) {
           setVisible(true)
         } else if (diff > 8) {
           setVisible(false)
@@ -62,17 +71,31 @@ export default function StickyCardNav() {
 
     window.addEventListener('scroll', onScroll, { passive: true })
     return () => window.removeEventListener('scroll', onScroll)
-  }, [])
+  }, [menuOpen])
 
   const shellClassName = useMemo(
     () =>
       [
         '!fixed !top-4 !left-1/2 !z-[120] !w-[min(94vw,980px)] !max-w-none !-translate-x-1/2',
         'transition-transform duration-300 ease-out',
-        visible ? 'translate-y-0 opacity-100' : '-translate-y-[120%] opacity-95',
+        visible || menuOpen ? 'translate-y-0 opacity-100' : '-translate-y-[120%] opacity-95',
+        'pointer-events-auto',
       ].join(' '),
-    [visible]
+    [visible, menuOpen]
   )
+
+  // Wait until mounted so phone Safari doesn't start on desktop glass tree then swap (broke open height).
+  if (!mounted) {
+    return (
+      <div
+        className={[
+          '!fixed !top-4 !left-1/2 !z-[120] !h-[60px] !w-[min(94vw,980px)] !-translate-x-1/2',
+          'rounded-2xl border border-[#E8EAEB] bg-white/95 shadow-sm',
+        ].join(' ')}
+        aria-hidden
+      />
+    )
+  }
 
   return (
     <CardNav
@@ -81,11 +104,16 @@ export default function StickyCardNav() {
       items={NAV_ITEMS}
       className={shellClassName}
       useGlassSurface={!isMobile}
-      navClassName={isMobile ? '!rounded-2xl !bg-white/95 !border !border-[#E8EAEB] !shadow-sm' : '!rounded-2xl backdrop-blur-2xl'}
+      navClassName={
+        isMobile
+          ? '!rounded-2xl !bg-white/95 !border !border-[#E8EAEB] !shadow-sm'
+          : '!rounded-2xl backdrop-blur-2xl'
+      }
       baseColor={isMobile ? '#ffffff' : 'transparent'}
       menuColor="#1E1E1E"
       buttonBgColor="#00D47E"
       buttonTextColor="#0F1113"
+      onExpandedChange={setMenuOpen}
     />
   )
 }
