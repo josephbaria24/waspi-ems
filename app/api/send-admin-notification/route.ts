@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
+import { renderEmailTemplate } from "@/lib/email-templates"
+import { loadEventEmailTemplate } from "@/lib/load-event-email-template"
 
 const transporter = nodemailer.createTransport({
   host: "smtp.hostinger.com",
@@ -29,11 +31,38 @@ export async function POST(request: Request) {
       event_name,
       venue,
       price,
+      event_id,
+      link,
     } = body
 
     const fullName = middle_name 
       ? `${personal_name} ${middle_name} ${last_name}`
       : `${personal_name} ${last_name}`
+
+    if (event_id) {
+      const template = await loadEventEmailTemplate(Number(event_id), "admin_notification")
+      if (!template.enabled) {
+        return NextResponse.json({ success: true, skipped: true, reason: "Template disabled" })
+      }
+
+      const rendered = renderEmailTemplate(template, {
+        name: fullName,
+        first_name: personal_name || "",
+        event_name: String(event_name || ""),
+        venue: String(venue || ""),
+        reference_id: String(reference_id || ""),
+        link: String(link || email || "#"),
+      })
+
+      await transporter.sendMail({
+        from: `"${rendered.fromName}" <no-reply@waspi.ph>`,
+        to: "no-reply@waspi.ph",
+        subject: rendered.subject,
+        html: rendered.html,
+      })
+
+      return NextResponse.json({ success: true })
+    }
 
     const employmentInfo = company 
       ? `

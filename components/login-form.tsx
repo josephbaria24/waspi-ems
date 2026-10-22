@@ -99,11 +99,11 @@ export function LoginForm({
           style={{ backgroundColor: "#ffffff", backdropFilter: "blur(10px)" }}
         >
           <CardHeader className="text-center pb-2">
-            <div className="flex justify-center mb-4">
+            <div className="mb-4 flex justify-center">
               <img
-                src="https://waspi.ph/wp-content/uploads/2024/09/cropped-WASPI-Logo-Header-2024-515x84.png"
+                src="/waspi-logo.png"
                 alt="WASPI Logo"
-                className="w-80 h-auto object-contain"
+                className="h-20 w-auto object-contain"
               />
             </div>
             <CardTitle className="text-2xl font-bold text-gray-900">

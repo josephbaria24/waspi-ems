@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus, BookOpen, GraduationCap, Video, Trash2, X, Link2, Copy } from "lucide-react"
+import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus, BookOpen, GraduationCap, Video, Trash2, X, Link2, Copy, ExternalLink, Mails } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -14,6 +14,7 @@ import ExportAttendeesModal from "@/components/export-attendees-modal"
 import DownloadCertificatesModal from "@/components/download-certificates-modal"
 import SendDirectCertificateModal from "@/components/send-direct-certificate-modal"
 import AddAttendeeModal from "@/components/add-attendee-modal"
+import EditEmailsModal from "@/components/edit-emails-modal"
 import { supabase } from "@/lib/supabase-client"
 import { EventCoverCrop } from "@/components/event-cover-crop"
 import { normalizeRegistrationSlug, normalizeSlugList, registrationPath } from "@/lib/event-slugs"
@@ -148,14 +149,37 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
   const [showDownloadCertificatesModal, setShowDownloadCertificatesModal] = useState(false)
   const [showSendDirectCertificateModal, setShowSendDirectCertificateModal] = useState(false)
   const [showAddAttendeeModal, setShowAddAttendeeModal] = useState(false)
+  const [showEditEmailsModal, setShowEditEmailsModal] = useState(false)
 
-  const actions = [
-    { label: "Add New Attendee", icon: UserPlus },
-    { label: "Open Registration", icon: UserPlus },
+  const runAction = (label: string) => {
+    if (label === "Open Registration") {
+      if (!event.magic_link) {
+        alert("This event doesn't have a registration link yet.")
+        return
+      }
+      window.open(`/${event.magic_link}`, "_blank")
+      return
+    }
+    if (label === "Edit Certificate Template") setShowTemplateEditor(true)
+    if (label === "Edit Emails") setShowEditEmailsModal(true)
+    if (label === "Send Evaluations") setShowSendEvaluationsModal(true)
+    if (label === "Export Attendees") setShowExportModal(true)
+    if (label === "Download Certificates") setShowDownloadCertificatesModal(true)
+    if (label === "Send Direct Certificate") setShowSendDirectCertificateModal(true)
+    if (label === "Add New Attendee") setShowAddAttendeeModal(true)
+  }
+
+  const primaryActions = [
+    { label: "Open Registration", icon: ExternalLink, className: "bg-[#0B1F14] text-white hover:bg-[#163525]" },
+    { label: "Add New Attendee", icon: UserPlus, className: "bg-[#00D47E] text-[#0B1F14] hover:bg-[#00c174]" },
+    { label: "Export Attendees", icon: Download, className: "border border-[#017C7C]/30 bg-[#E8F5F5] text-[#017C7C] hover:bg-[#d7eeee]" },
+    { label: "Send Evaluations", icon: Mail, className: "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100" },
+  ]
+
+  const moreActions = [
+    { label: "Edit Emails", icon: Mails },
     { label: "Edit Certificate Template", icon: Palette },
-    { label: "Send Evaluations", icon: Mail },
     { label: "Send Direct Certificate", icon: Award },
-    { label: "Export Attendees", icon: Download },
     { label: "Download Certificates", icon: Award },
     { label: "Download Badges", icon: FileUp },
     { label: "Show Evaluation Results", icon: BarChart3 },
@@ -166,65 +190,70 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
     "w-full rounded-xl border border-[#E8EAEB] bg-white px-3 py-2.5 text-sm text-[#1E1E1E] outline-none focus-visible:border-[#00D47E] focus-visible:ring-2 focus-visible:ring-[#00D47E]/20"
 
   return (
-    <Card className="rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
-      <CardHeader className="flex flex-row items-start justify-between space-y-0">
-        <div>
-          <CardTitle className="text-[#1E1E1E]">Event Details</CardTitle>
-          <CardDescription className="text-[#8D959D]">Manage event information</CardDescription>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" size="icon" onClick={() => (isEditing ? cancelEditing() : startEditing())} className="rounded-full border-[#E8EAEB]">
+    <Card className="h-full overflow-hidden rounded-2xl border border-[#E8EAEB] border-l-4 border-l-[#00D47E] bg-white shadow-sm">
+      <CardHeader className="space-y-4 bg-[#F7FBF8]/80">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-[#017C7C]">Overview</p>
+            <CardTitle className="text-lg text-[#0B1F14]">Event Details</CardTitle>
+            <CardDescription className="mt-1 text-[#8D959D]">Info, links, and event tools</CardDescription>
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => (isEditing ? cancelEditing() : startEditing())}
+            className={`h-9 shrink-0 gap-2 rounded-xl px-3 font-medium ${
+              isEditing
+                ? "border-red-200 bg-red-50 text-red-700 hover:bg-red-100"
+                : "border-[#00D47E]/40 bg-[#00D47E]/15 text-[#0B1F14] hover:bg-[#00D47E]/25"
+            }`}
+          >
             <Edit2 className="h-4 w-4" />
+            {isEditing ? "Cancel" : "Edit"}
           </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="icon" className="rounded-full border-[#E8EAEB] bg-transparent">
-                <MoreVertical className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              {actions.map((action) => {
+        </div>
+
+        {!isEditing && (
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              {primaryActions.map((action) => {
                 const Icon = action.icon
                 return (
-                  <DropdownMenuItem
+                  <button
                     key={action.label}
-                    className="cursor-pointer"
-                    onClick={async () => {
-                      if (action.label === "Open Registration") {
-                        if (!event.magic_link) {
-                          alert("⚠️ This event doesn't have a registration link yet.")
-                          return
-                        }
-                        window.open(`/${event.magic_link}`, "_blank")
-                      }
-                      if (action.label === "Edit Certificate Template") {
-                        setShowTemplateEditor(true)
-                      }
-                      if (action.label === "Send Evaluations") {
-                        setShowSendEvaluationsModal(true)
-                      }
-                      if (action.label === "Export Attendees") {
-                        setShowExportModal(true)
-                      }
-                      if (action.label === "Download Certificates") {
-                        setShowDownloadCertificatesModal(true)
-                      }
-                      if (action.label === "Send Direct Certificate") {
-                        setShowSendDirectCertificateModal(true)
-                      }
-                      if (action.label === "Add New Attendee") {
-                        setShowAddAttendeeModal(true)
-                      }
-                    }}
+                    type="button"
+                    onClick={() => runAction(action.label)}
+                    className={`flex h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${action.className}`}
                   >
-                    <Icon className="mr-2 h-4 w-4 hover:text-white" />
-                    <span>{action.label}</span>
-                  </DropdownMenuItem>
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="truncate">{action.label}</span>
+                  </button>
                 )
               })}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
+            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="h-10 w-full justify-between rounded-xl border-[#E8EAEB] bg-white font-medium text-[#1E1E1E] hover:bg-white">
+                  <span className="inline-flex items-center gap-2">
+                    <MoreVertical className="h-4 w-4 text-[#017C7C]" />
+                    More tools
+                  </span>
+                  <span className="rounded-md bg-[#0B1F14] px-2 py-0.5 text-xs font-semibold text-white">{moreActions.length}</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                {moreActions.map((action) => {
+                  const Icon = action.icon
+                  return (
+                    <DropdownMenuItem key={action.label} className="cursor-pointer py-2.5" onClick={() => runAction(action.label)}>
+                      <Icon className="mr-2 h-4 w-4" />
+                      <span>{action.label}</span>
+                    </DropdownMenuItem>
+                  )
+                })}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        )}
       </CardHeader>
 
       <CardContent>
@@ -561,56 +590,59 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
               </div>
             </div>
           ) : (
-            <div className="space-y-4">
+            <div className="space-y-5">
               <div className="grid grid-cols-3 gap-2">
-                <div className="rounded-xl bg-sky-50 px-3 py-3 text-center">
-                  <Users className="mx-auto mb-1 h-4 w-4 text-sky-700" />
-                  <p className="text-xl font-semibold text-[#1E1E1E]">{event.attendees.registered}</p>
-                  <p className="text-[11px] text-sky-700">Registered</p>
+                {[
+                  { label: "Registered", value: event.attendees.registered, icon: Users, wrap: "bg-sky-50 border-sky-200", iconClass: "text-sky-600", labelClass: "text-sky-700" },
+                  { label: "Attended", value: event.attendees.attended, icon: CheckCircle2, wrap: "bg-emerald-50 border-emerald-200", iconClass: "text-emerald-600", labelClass: "text-emerald-700" },
+                  { label: "Paid", value: event.attendees.paid, icon: CreditCard, wrap: "bg-amber-50 border-amber-200", iconClass: "text-amber-600", labelClass: "text-amber-700" },
+                ].map((stat) => {
+                  const Icon = stat.icon
+                  return (
+                    <div key={stat.label} className={`rounded-xl border px-3 py-3 ${stat.wrap}`}>
+                      <Icon className={`mb-1 h-3.5 w-3.5 ${stat.iconClass}`} />
+                      <p className="text-xl font-semibold tabular-nums text-[#0B1F14]">{stat.value}</p>
+                      <p className={`text-[11px] font-semibold ${stat.labelClass}`}>{stat.label}</p>
+                    </div>
+                  )
+                })}
+              </div>
+
+              <div className="space-y-2">
+                <div className="grid gap-2 sm:grid-cols-2">
+                  <div className="rounded-xl border border-violet-200 bg-violet-50 px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-violet-600">Type</p>
+                    <p className="mt-1 font-semibold text-violet-950">{editedEvent.type}</p>
+                  </div>
+                  <div className="rounded-xl border border-[#017C7C]/25 bg-[#E8F5F5] px-4 py-3">
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-[#017C7C]">Price</p>
+                    <p className="mt-1 font-semibold text-[#017C7C]">₱{editedEvent.price.toLocaleString()}</p>
+                  </div>
                 </div>
-                <div className="rounded-xl bg-emerald-50 px-3 py-3 text-center">
-                  <CheckCircle2 className="mx-auto mb-1 h-4 w-4 text-emerald-700" />
-                  <p className="text-xl font-semibold text-[#1E1E1E]">{event.attendees.attended}</p>
-                  <p className="text-[11px] text-emerald-700">Attended</p>
-                </div>
-                <div className="rounded-xl bg-amber-50 px-3 py-3 text-center">
-                  <CreditCard className="mx-auto mb-1 h-4 w-4 text-amber-700" />
-                  <p className="text-xl font-semibold text-[#1E1E1E]">{event.attendees.paid}</p>
-                  <p className="text-[11px] text-amber-700">Paid</p>
+                <div className="rounded-xl border border-[#00D47E]/35 bg-[#00D47E]/10 px-4 py-3">
+                  <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#0B1F14]/70">
+                    <MapPin className="h-3.5 w-3.5 text-[#00D47E]" />
+                    Venue
+                  </p>
+                  <p className="mt-1 font-semibold text-[#0B1F14]">{editedEvent.venue}</p>
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2">
-                <div className="rounded-2xl border border-[#E8EAEB] bg-[#F7FBF8] p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Type</p>
-                  <p className="mt-1 font-semibold text-[#1E1E1E]">{editedEvent.type}</p>
+              <section className="overflow-hidden rounded-xl border border-[#017C7C]/25">
+                <div className="flex items-center justify-between bg-[#017C7C] px-4 py-2.5">
+                  <p className="flex items-center gap-1.5 text-sm font-semibold text-white">
+                    <Link2 className="h-4 w-4" />
+                    Registration links
+                  </p>
                 </div>
-                <div className="rounded-2xl border border-[#E8EAEB] bg-[#F7FBF8] p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Price</p>
-                  <p className="mt-1 font-semibold text-[#017C7C]">₱{editedEvent.price.toLocaleString()}</p>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">
-                  <MapPin className="h-3.5 w-3.5 text-[#017C7C]" />
-                  Venue
-                </p>
-                <p className="mt-1 font-semibold text-[#1E1E1E]">{editedEvent.venue}</p>
-              </div>
-
-              <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
-                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">
-                  <Link2 className="h-3.5 w-3.5 text-[#017C7C]" />
-                  Registration links
-                </p>
-                {editedEvent.magic_link ? (
-                  <div className="mt-2 space-y-2">
-                    {[editedEvent.magic_link, ...normalizeSlugList(editedEvent.magic_link_aliases)].map((slug, index) => (
-                      <div key={slug} className="flex items-start gap-2">
+                <div className="divide-y divide-[#E8EAEB] bg-white p-2">
+                  {editedEvent.magic_link ? (
+                    [editedEvent.magic_link, ...normalizeSlugList(editedEvent.magic_link_aliases)].map((slug, index) => (
+                      <div key={slug} className="flex items-center gap-2 rounded-lg px-2 py-2.5 hover:bg-[#E8F5F5]">
                         <div className="min-w-0 flex-1">
-                          {index === 0 && <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8D959D]">Primary</p>}
-                          {index > 0 && <p className="text-[10px] font-semibold uppercase tracking-wide text-[#8D959D]">Extra</p>}
+                          <p className={`text-[10px] font-semibold uppercase tracking-wide ${index === 0 ? "text-[#017C7C]" : "text-amber-700"}`}>
+                            {index === 0 ? "Primary" : "Extra"}
+                          </p>
                           <a
                             href={registrationPath(slug)}
                             target="_blank"
@@ -622,9 +654,8 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                         </div>
                         <Button
                           type="button"
-                          variant="outline"
                           size="sm"
-                          className="h-8 shrink-0 rounded-full border-[#E8EAEB] px-2.5"
+                          className="h-9 shrink-0 gap-1.5 rounded-lg bg-[#00D47E] px-3 font-semibold text-[#0B1F14] hover:bg-[#00c174]"
                           onClick={async () => {
                             const full = `${window.location.origin}${registrationPath(slug)}`
                             await navigator.clipboard.writeText(full)
@@ -632,60 +663,84 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                           }}
                         >
                           <Copy className="h-3.5 w-3.5" />
+                          Copy
                         </Button>
                       </div>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="mt-1 text-sm text-[#8D959D]">No registration slug yet. Edit the event to set one.</p>
-                )}
-              </div>
+                    ))
+                  ) : (
+                    <p className="px-2 py-3 text-sm text-[#8D959D]">No registration slug yet. Edit the event to set one.</p>
+                  )}
+                </div>
+              </section>
 
               {editedEvent.description && (
-                <div className="rounded-2xl border border-[#E8EAEB] bg-white p-3">
-                  <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Description</p>
-                  <p className="mt-1 whitespace-pre-wrap text-sm text-[#1E1E1E]">{editedEvent.description}</p>
-                </div>
+                <section className="rounded-xl border border-sky-200 bg-sky-50/60 px-4 py-3">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-sky-700">Description</p>
+                  <p className="mt-1.5 whitespace-pre-wrap text-sm leading-relaxed text-[#1E1E1E]">{editedEvent.description}</p>
+                </section>
               )}
 
               {editedEvent.feature_image && (
                 <img
                   src={editedEvent.feature_image}
                   alt=""
-                  className="aspect-[1200/628] w-full rounded-2xl border border-[#E8EAEB] object-cover"
+                  className="aspect-[1200/628] w-full rounded-xl border border-[#E8EAEB] object-cover"
                 />
               )}
 
-              {editedEvent.schedule && editedEvent.schedule.length > 0 ? (
-                <div className="space-y-3 rounded-2xl border border-[#E8EAEB] bg-white p-3">
-                  <p className="flex items-center gap-2 text-sm font-semibold text-[#1E1E1E]">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-700">
-                      <CalendarDays className="h-4 w-4" />
-                    </span>
-                    Schedule
-                  </p>
-                  {editedEvent.schedule.map((sched, index) => (
-                    <div key={index} className="rounded-2xl bg-[#F7FBF8] p-3">
-                      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#8D959D]">Day {index + 1}</p>
-                      <p className="mt-1 text-sm font-semibold text-[#1E1E1E]">
-                        {dateInputValue(sched.date) || "No date"}
-                        {sched.timeIn || sched.timeOut ? ` · ${sched.timeIn || "—"} – ${sched.timeOut || "—"}` : ""}
-                      </p>
-                    </div>
-                  ))}
+              <section className="overflow-hidden rounded-xl border border-[#0B1F14]/15">
+                <div className="flex items-center gap-2 bg-[#0B1F14] px-4 py-2.5">
+                  <CalendarDays className="h-4 w-4 text-[#00D47E]" />
+                  <p className="text-sm font-semibold text-white">Schedule</p>
                 </div>
-              ) : (
-                <div className="rounded-2xl border border-dashed border-[#CDEEDD] bg-[#F7FBF8] px-4 py-4">
-                  <p className="text-sm text-[#8D959D]">No schedule available</p>
-                </div>
-              )}
+                {editedEvent.schedule && editedEvent.schedule.length > 0 ? (
+                  <ol className="divide-y divide-[#E8EAEB] bg-white">
+                    {editedEvent.schedule.map((sched, index) => (
+                      <li key={index} className="flex items-start gap-3 px-4 py-3">
+                        <span className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#00D47E] text-xs font-bold text-[#0B1F14]">
+                          {index + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-[#1E1E1E]">
+                            {dateInputValue(sched.date)
+                              ? new Date(dateInputValue(sched.date) + "T12:00:00").toLocaleDateString(undefined, {
+                                  weekday: "short",
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })
+                              : "No date"}
+                          </p>
+                          {(sched.timeIn || sched.timeOut) && (
+                            <p className="mt-0.5 flex items-center gap-1 text-xs text-[#017C7C]">
+                              <Clock className="h-3 w-3" />
+                              {sched.timeIn || "—"} – {sched.timeOut || "—"}
+                            </p>
+                          )}
+                        </div>
+                      </li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="bg-white px-4 py-4 text-sm text-[#8D959D]">No schedule available</p>
+                )}
+              </section>
 
-              <div className="space-y-2 rounded-2xl border border-[#E8EAEB] bg-white p-3">
-                <p className="text-sm font-semibold text-[#1E1E1E]">Covered Topics</p>
-                <div className="flex flex-wrap gap-2">
+              <section className="rounded-xl border border-[#00D47E]/30 bg-[#F7FBF8] px-4 py-3">
+                <p className="text-sm font-semibold text-[#0B1F14]">Covered Topics</p>
+                <div className="mt-2 flex flex-wrap gap-2">
                   {editedEvent.schedule?.[0]?.coveredTopics?.length ? (
-                    editedEvent.schedule[0].coveredTopics.map((topic) => (
-                      <span key={topic} className="rounded-full bg-[#00D47E]/15 px-3 py-1 text-sm font-medium text-[#0B1F14]">
+                    editedEvent.schedule[0].coveredTopics.map((topic, i) => (
+                      <span
+                        key={topic}
+                        className={`rounded-md border px-2.5 py-1 text-sm font-medium ${
+                          i % 3 === 0
+                            ? "border-[#00D47E]/40 bg-[#00D47E]/15 text-[#0B1F14]"
+                            : i % 3 === 1
+                              ? "border-[#017C7C]/30 bg-[#E8F5F5] text-[#017C7C]"
+                              : "border-amber-200 bg-amber-50 text-amber-800"
+                        }`}
+                      >
                         {topic}
                       </span>
                     ))
@@ -693,8 +748,7 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                     <p className="text-sm text-[#8D959D]">No topics yet</p>
                   )}
                 </div>
-              </div>
-
+              </section>
             </div>
           )}
         </div>
@@ -741,6 +795,13 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
         open={showAddAttendeeModal}
         onClose={() => setShowAddAttendeeModal(false)}
         onAttendeeAdded={onAttendeeAdded}
+      />
+
+      <EditEmailsModal
+        eventId={Number(event.id)}
+        eventName={event.name}
+        open={showEditEmailsModal}
+        onClose={() => setShowEditEmailsModal(false)}
       />
     </Card>
   )

@@ -426,6 +426,7 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
               reference_id: attendee.reference_id,
               event_name: event.name,
               venue: event.venue,
+              event_id: event.id,
               link: `${window.location.origin}/submission/${encodeURIComponent(attendee.reference_id)}`,
             }),
           })
@@ -449,6 +450,8 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
               event_name: event.name,
               venue: event.venue,
               price: event.price,
+              event_id: event.id,
+              link: `${window.location.origin}/submission/${encodeURIComponent(attendee.reference_id)}`,
             }),
           })
         }

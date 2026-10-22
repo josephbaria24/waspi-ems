@@ -5,6 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
 import fs from "fs/promises";
 import path from "path";
+import { renderEmailTemplate } from "@/lib/email-templates";
+import { loadEventEmailTemplate } from "@/lib/load-event-email-template";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -286,36 +288,24 @@ export async function POST(req: Request) {
 
     console.log("Certificate PDF generated successfully");
 
+    const emailTemplate = await loadEventEmailTemplate(event.id, "certificate_participation");
+    if (!emailTemplate.enabled) {
+      return NextResponse.json({ success: false, error: "Certificate email template is disabled" }, { status: 400 });
+    }
+
+    const rendered = renderEmailTemplate(emailTemplate, {
+      name: `${attendee.personal_name} ${attendee.last_name}`,
+      first_name: attendee.personal_name || "",
+      event_name: event.name,
+      venue: event.venue || "",
+      certificate_label: "Participation",
+    });
+
     const mailOptions = {
-      from: `"WASPI" <no-reply@waspi.ph>`,
+      from: `"${rendered.fromName}" <no-reply@waspi.ph>`,
       to: email,
-      subject: `Certificate of Participation - ${event.name}`,
-      html: `
-        <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
-          <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; overflow: hidden;">
-          <div style="background-color: #ffffff; text-align: center; padding: 20px; border: 3px solid #1e1b4b;border-radius: 10px;">
-          <img src="https://waspi.ph/wp-content/uploads/2024/09/cropped-WASPI-Logo-Header-2024-515x84.png" 
-               alt="WASPI Logo" 
-               style="height: 80px;" />
-        </div>
-            <div style="padding: 30px; color: #333;">
-              <h2>Congratulations, ${attendee.personal_name} ${attendee.last_name}!</h2>
-              <p>
-                Thank you for completing the evaluation for <strong>${event.name}</strong>.
-              </p>
-              <p>
-                Please find attached your <strong>Certificate of Participation</strong>.
-              </p>
-              <p style="margin-top: 30px; color: #666; font-size: 14px;">
-                If you have any questions, please don't hesitate to contact info@waspi.ph
-              </p>
-            </div>
-            <div style="background-color: #f9fafb; padding: 20px; text-align: center; color: #666; font-size: 12px;">
-              <p>© ${new Date().getFullYear()} WASPI. All rights reserved.</p>
-            </div>
-          </div>
-        </div>
-      `,
+      subject: rendered.subject,
+      html: rendered.html,
       attachments: [
         {
           filename: `Certificate_${fullName.replace(/\s+/g, "_")}.pdf`,

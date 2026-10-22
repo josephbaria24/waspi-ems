@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
 import { createClient } from "@supabase/supabase-js"
+import { renderEmailTemplate } from "@/lib/email-templates"
+import { loadEventEmailTemplate } from "@/lib/load-event-email-template"
 
 // ✅ Setup Supabase (Server-side client)
 const supabase = createClient(
@@ -103,43 +105,33 @@ export async function POST(req: Request) {
       }
 
       try {
-        // ✅ Dynamic evaluation link (changes between dev & prod)
         const evalLink = `${baseUrl}/evaluation/${encodeURIComponent(attendee.reference_id)}`
+        const template = await loadEventEmailTemplate(Number(eventId), "evaluation_invite")
+
+        if (!template.enabled) {
+          failed.push({
+            id: attendee.id,
+            name: fullName,
+            email: cleanEmail,
+            error: "Evaluation email template is disabled",
+          })
+          continue
+        }
+
+        const rendered = renderEmailTemplate(template, {
+          name: fullName,
+          first_name: attendee.personal_name || "",
+          event_name: event?.name || "",
+          eval_link: evalLink,
+          link: evalLink,
+          reference_id: attendee.reference_id || "",
+        })
 
         const mailOptions = {
-          from: `"WASPI" <no-reply@waspi.ph>`,
+          from: `"${rendered.fromName}" <no-reply@waspi.ph>`,
           to: cleanEmail,
-          subject: `Evaluation Form - ${event?.name}`,
-          html: `
-            <div style="font-family: Arial, sans-serif; background-color: #f5f5f5; padding: 30px;">
-              <div style="max-width: 600px; margin: auto; background: #ffffff; border-radius: 10px; overflow: hidden;">
-              <div style="background-color: #ffffff; text-align: center; padding: 20px; border: 3px solid #1e1b4b;border-radius: 10px;">
-              <img src="https://waspi.ph/wp-content/uploads/2024/09/cropped-WASPI-Logo-Header-2024-515x84.png" 
-                   alt="WASPI Logo" 
-                   style="height: 80px;" />
-            </div>
-                <div style="padding: 30px; color: #333;">
-                  <h2>Hi, ${attendee.personal_name} ${attendee.last_name}!</h2>
-                  <p>
-                    Congratulations for completing the <strong>${event?.name}</strong>.<br/><br/>
-                    We would like to invite you to complete an evaluation about the said Conference.
-                    Once done, you will receive another email with your digital certificate copy.
-                  </p>
-                  <p>You may take the evaluation by clicking the button below. Thank you!</p>
-                  <div style="text-align: center; margin-top: 25px;">
-                    <a href="${evalLink}"
-                      style="background-color: #1e1b4b; color: #ffffff; padding: 12px 25px;
-                             border-radius: 6px; text-decoration: none; font-weight: bold;">
-                      Take Evaluation
-                    </a>
-                  </div>
-                  <p style="margin-top: 30px; color: #666; font-size: 14px;">
-                  If you have any questions, please don't hesitate to contact info@waspi.ph.
-                </p>
-                </div>
-              </div>
-            </div>
-          `,
+          subject: rendered.subject,
+          html: rendered.html,
         }
 
         await transporter.sendMail(mailOptions)

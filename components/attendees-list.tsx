@@ -2,14 +2,14 @@
 "use client"
 
 import { useEffect, useState, useMemo, useCallback } from "react"
-import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle, Users, Mic, UserCircle, Trash2 } from "lucide-react"
+import { Calendar, Search, Pencil, Clock, TrendingUp, CheckCircle2, Zap, X, Mail, Send, AlertCircle, Users, Mic, UserCircle, Trash2, CircleDollarSign, Gift } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { supabase } from "@/lib/supabase-client"
@@ -38,7 +38,17 @@ interface EventScheduleDate {
   date: string // ISO format e.g. "2025-11-06"
 }
 
-type QuickActionMode = "payment" | "attendance" | "email" | "organizer" | "speaker" | "attendee" | "delete" | null
+type QuickActionMode =
+  | "payment"
+  | "attendance"
+  | "email"
+  | "organizer"
+  | "speaker"
+  | "attendee"
+  | "paying"
+  | "non-paying"
+  | "delete"
+  | null
 
 interface EmailResult {
   name: string
@@ -99,11 +109,26 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
     fetchAttendees()
   }, [eventId, refreshKey])
 
-  // Check if attendee is exempt from payment (Organizer or Speaker)
+  // Exempt from payment tracking: Organizer, Speaker, or tagged Non-Paying
   const isPaymentExempt = useCallback((roles?: string[]) => {
     if (!roles || roles.length === 0) return false
-    return roles.includes("Organizer") || roles.includes("Speaker")
+    return roles.includes("Organizer") || roles.includes("Speaker") || roles.includes("Non-Paying")
   }, [])
+
+  const applyRoleTag = (currentRoles: string[], roleToAdd: string) => {
+    let next = currentRoles.includes(roleToAdd)
+      ? currentRoles
+      : [...currentRoles, roleToAdd]
+
+    // Paying / Non-Paying are mutually exclusive tags
+    if (roleToAdd === "Paying") {
+      next = next.filter((r) => r !== "Non-Paying")
+    } else if (roleToAdd === "Non-Paying") {
+      next = next.filter((r) => r !== "Paying")
+    }
+
+    return next
+  }
 
   const toggleAttendance = async (attendeeId: number, isoDate: string) => {
     const epochDate = scheduleDateEpoch(isoDate)
@@ -154,7 +179,7 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
     const currentRoles = attendee.roles || []
     const updatedRoles = currentRoles.includes(role)
       ? currentRoles.filter(r => r !== role)
-      : [...currentRoles, role]
+      : applyRoleTag(currentRoles, role)
 
     const { error } = await supabase
       .from("attendees")
@@ -294,6 +319,7 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
             reference_id: attendee.reference_id,
             event_name: eventName,
             venue: venue,
+            event_id: parseInt(eventId),
             link: submissionLink
           })
         })
@@ -411,17 +437,29 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
       )
 
       alert(`✅ Marked ${selectedIds.length} attendee(s) as Fully Paid`)
-    } else if (quickActionMode === "organizer" || quickActionMode === "speaker" || quickActionMode === "attendee") {
-      const roleToAdd = quickActionMode === "organizer" ? "Organizer" : quickActionMode === "speaker" ? "Speaker" : "Attendee"
+    } else if (
+      quickActionMode === "organizer" ||
+      quickActionMode === "speaker" ||
+      quickActionMode === "attendee" ||
+      quickActionMode === "paying" ||
+      quickActionMode === "non-paying"
+    ) {
+      const roleToAdd =
+        quickActionMode === "organizer"
+          ? "Organizer"
+          : quickActionMode === "speaker"
+            ? "Speaker"
+            : quickActionMode === "attendee"
+              ? "Attendee"
+              : quickActionMode === "paying"
+                ? "Paying"
+                : "Non-Paying"
 
       const updates = selectedIds.map(async (id) => {
         const attendee = attendees.find(a => a.id === id)
         if (!attendee) return
 
-        const currentRoles = attendee.roles || []
-        const updatedRoles = currentRoles.includes(roleToAdd)
-          ? currentRoles
-          : [...currentRoles, roleToAdd]
+        const updatedRoles = applyRoleTag(attendee.roles || [], roleToAdd)
 
         return supabase
           .from("attendees")
@@ -553,6 +591,10 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
         return <Mic className="h-3 w-3" />
       case "Attendee":
         return <UserCircle className="h-3 w-3" />
+      case "Paying":
+        return <CircleDollarSign className="h-3 w-3" />
+      case "Non-Paying":
+        return <Gift className="h-3 w-3" />
       default:
         return null
     }
@@ -566,10 +608,33 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
         return "bg-purple-100 text-purple-700"
       case "Attendee":
         return "bg-gray-100 text-gray-700"
+      case "Paying":
+        return "bg-emerald-100 text-emerald-700"
+      case "Non-Paying":
+        return "bg-amber-100 text-amber-800"
       default:
         return "bg-gray-100 text-gray-700"
     }
   }
+
+  const quickActionTitle =
+    quickActionMode === "payment"
+      ? "Quick Mark as Fully Paid"
+      : quickActionMode === "attendance"
+        ? "Quick Mark as Present"
+        : quickActionMode === "organizer"
+          ? "Quick Mark as Organizer"
+          : quickActionMode === "speaker"
+            ? "Quick Mark as Speaker"
+            : quickActionMode === "attendee"
+              ? "Quick Mark as Attendee"
+              : quickActionMode === "paying"
+                ? "Quick Mark as Paying"
+                : quickActionMode === "non-paying"
+                  ? "Quick Mark as Non-Paying"
+                  : quickActionMode === "delete"
+                    ? "Delete selected attendees"
+                    : "Send Confirmation Emails"
 
   const successCount = emailResults.filter(r => r.status === "success").length
   const errorCount = emailResults.filter(r => r.status === "error").length
@@ -577,99 +642,113 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
 
   return (
     <>
-      <Card className="rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
-        <CardHeader>
-          <div className="space-y-4">
+      <Card className="flex h-full min-h-0 w-full min-w-0 flex-col rounded-2xl border border-[#E8EAEB] bg-white shadow-sm">
+        <CardHeader className="shrink-0 space-y-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
             <div>
-              <CardTitle className="text-[#1E1E1E]">Attendance Details</CardTitle>
+              <CardTitle className="text-lg text-[#1E1E1E]">Attendance</CardTitle>
               <CardDescription className="mt-1 text-[#8D959D]">
-                Showing {filteredAttendees.length} results
+                Search, tag, and update attendees
               </CardDescription>
             </div>
+            <span className="inline-flex w-fit items-center rounded-lg border border-[#E8EAEB] bg-[#F7FBF8] px-2.5 py-1 text-xs font-semibold tabular-nums text-[#0B1F14]">
+              {filteredAttendees.length} shown
+            </span>
+          </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-              <div className="relative w-full sm:w-64 md:w-80">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="text"
-                  placeholder="Search by attendee..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 w-full"
-                />
-              </div>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" className="gap-2 w-full sm:w-auto">
-                    <Zap className="h-4 w-4" />
-                    Quick Actions
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={() => handleQuickActionSelect("email")}>
-                    <Mail className="h-4 w-4 mr-2" />
-                    Send Confirmation Emails
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleQuickActionSelect("payment")}>
-                    <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Mark as Fully Paid
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleQuickActionSelect("attendance")}>
-                    <Calendar className="h-4 w-4 mr-2" />
-                    Mark as Present
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleQuickActionSelect("organizer")}>
-                    <Users className="h-4 w-4 mr-2" />
-                    Mark as Organizer
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleQuickActionSelect("speaker")}>
-                    <Mic className="h-4 w-4 mr-2" />
-                    Mark as Speaker
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => handleQuickActionSelect("attendee")}>
-                    <UserCircle className="h-4 w-4 mr-2" />
-                    Mark as Attendee
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    onClick={() => handleQuickActionSelect("delete")}
-                    className="text-red-600 focus:text-red-600"
-                  >
-                    <Trash2 className="h-4 w-4 mr-2" />
-                    Delete attendees
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div className="relative min-w-0 flex-1">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[#8D959D]" />
+              <Input
+                type="text"
+                placeholder="Search name or email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="h-11 rounded-xl border-[#E8EAEB] bg-[#F7FBF8] pl-9 focus-visible:bg-white"
+              />
             </div>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button className="h-11 shrink-0 gap-2 rounded-xl bg-[#0B1F14] px-4 font-semibold text-white hover:bg-[#0B1F14]/90">
+                  <Zap className="h-4 w-4" />
+                  Quick Actions
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-[#8D959D]">
+                  Communication
+                </DropdownMenuLabel>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("email")}>
+                  <Mail className="mr-2 h-4 w-4" />
+                  Send Confirmation Emails
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-[#8D959D]">
+                  Status
+                </DropdownMenuLabel>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("payment")}>
+                  <CheckCircle2 className="mr-2 h-4 w-4" />
+                  Mark as Fully Paid
+                </DropdownMenuItem>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("attendance")}>
+                  <Calendar className="mr-2 h-4 w-4" />
+                  Mark as Present
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuLabel className="text-[11px] uppercase tracking-wide text-[#8D959D]">
+                  Tags
+                </DropdownMenuLabel>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("organizer")}>
+                  <Users className="mr-2 h-4 w-4" />
+                  Mark as Organizer
+                </DropdownMenuItem>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("speaker")}>
+                  <Mic className="mr-2 h-4 w-4" />
+                  Mark as Speaker
+                </DropdownMenuItem>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("attendee")}>
+                  <UserCircle className="mr-2 h-4 w-4" />
+                  Mark as Attendee
+                </DropdownMenuItem>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("paying")}>
+                  <CircleDollarSign className="mr-2 h-4 w-4" />
+                  Mark as Paying
+                </DropdownMenuItem>
+                <DropdownMenuItem className="py-2.5" onClick={() => handleQuickActionSelect("non-paying")}>
+                  <Gift className="mr-2 h-4 w-4" />
+                  Mark as Non-Paying
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={() => handleQuickActionSelect("delete")}
+                  className="py-2.5 text-red-600 focus:text-red-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />
+                  Delete attendees
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {quickActionMode && (
-            <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="rounded-xl border border-[#0B1F14]/15 bg-[#F7FBF8] p-4">
               <div className="flex flex-col gap-4">
                 <div className="flex items-start justify-between gap-2">
-                  <div className="flex items-center gap-2 flex-1 min-w-0">
-                    <Zap className="h-5 w-5 text-blue-600 flex-shrink-0" />
-                    <span className="font-semibold text-blue-900 text-sm sm:text-base truncate">
-                      {quickActionMode === "payment"
-                        ? "Quick Mark as Fully Paid"
-                        : quickActionMode === "attendance"
-                          ? "Quick Mark as Present"
-                          : quickActionMode === "organizer"
-                            ? "Quick Mark as Organizer"
-                            : quickActionMode === "speaker"
-                              ? "Quick Mark as Speaker"
-                              : quickActionMode === "attendee"
-                                ? "Quick Mark as Attendee"
-                                : quickActionMode === "delete"
-                                  ? "Delete selected attendees"
-                                  : "Send Confirmation Emails"}
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#0B1F14] text-white">
+                      <Zap className="h-4 w-4" />
                     </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold text-[#1E1E1E]">{quickActionTitle}</p>
+                      <p className="text-xs text-[#8D959D]">Select rows below, then apply</p>
+                    </div>
                   </div>
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={handleCancelQuickAction}
-                    className="h-8 w-8 p-0 flex-shrink-0"
+                    className="h-8 w-8 shrink-0 p-0"
                     disabled={isSendingEmails}
                   >
                     <X className="h-4 w-4" />
@@ -697,8 +776,8 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                     </Select>
                   )}
 
-                  <div className="flex items-center justify-between sm:justify-start gap-3 flex-1">
-                    <span className="text-sm text-blue-700 font-medium">
+                  <div className="flex flex-1 items-center justify-between gap-3 sm:justify-start">
+                    <span className="rounded-md bg-white px-2.5 py-1 text-sm font-semibold tabular-nums text-[#0B1F14] ring-1 ring-[#E8EAEB]">
                       {selectedIds.length} selected
                     </span>
 
@@ -710,7 +789,11 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                         (quickActionMode === "attendance" && !selectedDate) ||
                         isSendingEmails
                       }
-                      className="whitespace-nowrap gap-2"
+                      className={`gap-2 whitespace-nowrap rounded-lg font-semibold ${
+                        quickActionMode === "delete"
+                          ? "bg-red-600 text-white hover:bg-red-700"
+                          : "bg-[#00D47E] text-[#0B1F14] hover:bg-[#00c174]"
+                      }`}
                     >
                       {isSendingEmails ? (
                         <>
@@ -793,30 +876,37 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
           )}
         </CardHeader>
 
-        <CardContent>
-          <div className="overflow-x-auto max-h-[600px] overflow-y-auto border rounded-lg">
-            <table className="min-w-full text-sm relative">
-              <thead className="sticky top-0 bg-background z-10 border-b">
+        <CardContent className="flex min-h-0 flex-1 flex-col pt-0">
+          <div className="min-h-0 w-full min-w-0 flex-1 overflow-x-auto overflow-y-auto rounded-xl border border-[#E8EAEB]">
+            <table className="relative w-full min-w-0 table-auto text-sm">
+              <thead className="sticky top-0 z-10 border-b border-[#E8EAEB] bg-[#F7FBF8]">
                 <tr>
                   {quickActionMode && (
-                    <th className="text-left py-3 px-3 font-semibold sticky left-0 bg-background z-20">
+                    <th className="sticky left-0 z-20 bg-[#F7FBF8] px-3 py-3 text-left">
                       <input
                         type="checkbox"
                         checked={selectedIds.length === filteredAttendees.length && filteredAttendees.length > 0}
                         onChange={toggleSelectAll}
-                        className="cursor-pointer"
+                        className="h-4 w-4 cursor-pointer accent-[#00D47E]"
                         disabled={isSendingEmails}
                       />
                     </th>
                   )}
-                  <th className="text-center py-3 px-3 font-semibold bg-background">Actions</th>
-                  <th className={`text-left py-3 px-3 font-semibold bg-background ${quickActionMode ? '' : 'sticky left-0 z-20'}`}>
+                  <th
+                    className={`bg-[#F7FBF8] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D] ${
+                      quickActionMode ? "" : "sticky left-0 z-20"
+                    }`}
+                  >
                     Attendee
                   </th>
-                  <th className="text-center py-3 px-3 font-semibold bg-background">Roles</th>
-                  <th className="text-center py-3 px-3 font-semibold bg-background">Payment Status</th>
+                  <th className="bg-[#F7FBF8] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
+                    Payment
+                  </th>
                   {scheduleDates.map((d) => (
-                    <th key={d.date} className="text-left py-3 px-3 font-semibold bg-background whitespace-nowrap">
+                    <th
+                      key={d.date}
+                      className="whitespace-nowrap bg-[#F7FBF8] px-3 py-3 text-left text-xs font-semibold uppercase tracking-wide text-[#8D959D]"
+                    >
                       {new Date(d.date).toLocaleDateString(undefined, {
                         weekday: "short",
                         month: "short",
@@ -824,109 +914,98 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                       })}
                     </th>
                   ))}
+                  <th className="bg-[#F7FBF8] px-3 py-3 text-center text-xs font-semibold uppercase tracking-wide text-[#8D959D]">
+                    Edit
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {filteredAttendees.map((attendee) => {
                   const exempt = isPaymentExempt(attendee.roles)
+                  const selected = selectedIds.includes(attendee.id)
 
                   return (
-                    <tr key={attendee.id} className="border-b hover:bg-muted/50">
+                    <tr
+                      key={attendee.id}
+                      className={`border-b border-[#E8EAEB] transition-colors ${
+                        selected ? "bg-[#00D47E]/10" : "bg-white hover:bg-[#F7FBF8]"
+                      }`}
+                    >
                       {quickActionMode && (
-                        <td className="px-3 py-3 sticky left-0 bg-background z-10">
+                        <td className={`sticky left-0 z-10 px-3 py-3 ${selected ? "bg-[#E8F9F0]" : "bg-white"}`}>
                           <input
                             type="checkbox"
-                            checked={selectedIds.includes(attendee.id)}
+                            checked={selected}
                             onChange={() => toggleSelectAttendee(attendee.id)}
-                            className="cursor-pointer"
+                            className="h-4 w-4 cursor-pointer accent-[#00D47E]"
                             disabled={isSendingEmails}
                           />
                         </td>
                       )}
-                      <td className="px-3 py-3 text-center bg-background">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleEditClick(attendee)}
-                          className="h-8 w-8"
-                          disabled={quickActionMode !== null}
-                        >
-                          <Pencil className="h-4 w-4" />
-                        </Button>
-                      </td>
-                      <td className={`px-3 py-3 font-medium bg-background whitespace-nowrap ${quickActionMode ? '' : 'sticky left-0'}`}>
-                        {attendee.name}
-                      </td>
-                      <td className="px-3 py-3 text-center bg-background">
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              className="h-8"
-                              disabled={quickActionMode !== null}
-                            >
+                      <td
+                        className={`min-w-[12rem] max-w-[22rem] px-3 py-3 ${
+                          quickActionMode ? "" : "sticky left-0 z-10"
+                        } ${selected ? "bg-[#E8F9F0]" : "bg-white"}`}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-[#1E1E1E]">{attendee.name}</p>
+                            <p className="truncate text-xs text-[#8D959D]">{attendee.email}</p>
+                            <div className="mt-1.5 flex flex-wrap gap-1">
                               {attendee.roles && attendee.roles.length > 0 ? (
-                                <span className="flex items-center gap-1">
-                                  {attendee.roles.length === 1 ? (
-                                    <>
-                                      {getRoleIcon(attendee.roles[0])}
-                                      {attendee.roles[0]}
-                                    </>
-                                  ) : (
-                                    `${attendee.roles.length} roles`
-                                  )}
-                                </span>
+                                attendee.roles.map((role) => (
+                                  <span
+                                    key={role}
+                                    className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[10px] font-semibold ${getRoleColor(role)}`}
+                                  >
+                                    {getRoleIcon(role)}
+                                    {role}
+                                  </span>
+                                ))
                               ) : (
-                                "No roles"
+                                <span className="text-[10px] text-[#8D959D]">No tags</span>
                               )}
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent>
-                            <DropdownMenuItem onClick={() => toggleRole(attendee.id, "Organizer")}>
-                              <div className="flex items-center gap-2 w-full">
-                                <Users className="h-4 w-4" />
-                                <span className="flex-1">Organizer</span>
-                                {attendee.roles?.includes("Organizer") && (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                )}
-                              </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleRole(attendee.id, "Speaker")}>
-                              <div className="flex items-center gap-2 w-full">
-                                <Mic className="h-4 w-4" />
-                                <span className="flex-1">Speaker</span>
-                                {attendee.roles?.includes("Speaker") && (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                )}
-                              </div>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => toggleRole(attendee.id, "Attendee")}>
-                              <div className="flex items-center gap-2 w-full">
-                                <UserCircle className="h-4 w-4" />
-                                <span className="flex-1">Attendee</span>
-                                {attendee.roles?.includes("Attendee") && (
-                                  <CheckCircle2 className="h-4 w-4 text-green-600" />
-                                )}
-                              </div>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </td>
-                      <td className="px-3 py-3 text-center bg-background">
-                        {exempt ? (
-                          <div className="flex items-center justify-center">
-                            <span className={`px-3 py-1 rounded-md border text-xs ${getPaymentStatusColor(attendee.payment_status, attendee.roles)}`}>
-                              N/A
-                            </span>
+                            </div>
                           </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-8 shrink-0 rounded-lg border-[#E8EAEB] px-2 text-xs"
+                                disabled={quickActionMode !== null}
+                              >
+                                Tags
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-52">
+                              {(["Organizer", "Speaker", "Attendee", "Paying", "Non-Paying"] as const).map((role) => (
+                                <DropdownMenuItem key={role} className="py-2" onClick={() => toggleRole(attendee.id, role)}>
+                                  <div className="flex w-full items-center gap-2">
+                                    {getRoleIcon(role)}
+                                    <span className="flex-1">{role}</span>
+                                    {attendee.roles?.includes(role) && (
+                                      <CheckCircle2 className="h-4 w-4 text-[#00D47E]" />
+                                    )}
+                                  </div>
+                                </DropdownMenuItem>
+                              ))}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </td>
+                      <td className="px-3 py-3">
+                        {exempt ? (
+                          <span className={`inline-flex rounded-lg border px-2.5 py-1.5 text-xs font-medium ${getPaymentStatusColor(attendee.payment_status, attendee.roles)}`}>
+                            N/A
+                          </span>
                         ) : (
                           <Select
                             value={attendee.payment_status || "Pending"}
                             onValueChange={(value) => updatePaymentStatus(attendee.id, value)}
                             disabled={quickActionMode !== null}
                           >
-                            <SelectTrigger className={`w-[140px] mx-auto text-xs ${getPaymentStatusColor(attendee.payment_status, attendee.roles)}`}>
+                            <SelectTrigger className={`h-9 w-[8.5rem] rounded-lg text-xs font-medium ${getPaymentStatusColor(attendee.payment_status, attendee.roles)}`}>
                               <SelectValue />
                             </SelectTrigger>
                             <SelectContent>
@@ -953,23 +1032,38 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
                         )}
                       </td>
 
-                      {scheduleDates.map((d) => (
-                        <td key={d.date} className="px-3 py-3">
-                          <Button
-                            variant="ghost"
-                            onClick={() => toggleAttendance(attendee.id, d.date)}
-                            disabled={quickActionMode !== null}
-                            className={`rounded-full px-3 py-1 border text-xs cursor-pointer whitespace-nowrap ${getStatusDisplay(attendee, d.date) === "Present"
-                                ? "bg-green-100 text-green-700 hover:bg-green-200"
-                                : getStatusDisplay(attendee, d.date) === "Absent"
-                                  ? "bg-red-100 text-red-700 hover:bg-red-200"
-                                  : "bg-muted text-muted-foreground hover:bg-muted/80"
+                      {scheduleDates.map((d) => {
+                        const status = getStatusDisplay(attendee, d.date)
+                        return (
+                          <td key={d.date} className="px-3 py-3">
+                            <button
+                              type="button"
+                              onClick={() => toggleAttendance(attendee.id, d.date)}
+                              disabled={quickActionMode !== null}
+                              className={`inline-flex h-9 min-w-[4.75rem] items-center justify-center gap-1 rounded-lg border px-2 text-xs font-semibold transition disabled:opacity-50 ${
+                                status === "Present"
+                                  ? "border-[#00D47E] bg-[#00D47E]/15 text-[#0B1F14]"
+                                  : status === "Absent"
+                                    ? "border-red-200 bg-red-50 text-red-700"
+                                    : "border-[#E8EAEB] bg-[#F7FBF8] text-[#8D959D] hover:border-[#00D47E]/50"
                               }`}
-                          >
-                            {getStatusDisplay(attendee, d.date)} <Calendar className="ml-1 h-3 w-3" />
-                          </Button>
-                        </td>
-                      ))}
+                            >
+                              {status}
+                            </button>
+                          </td>
+                        )
+                      })}
+                      <td className="px-3 py-3 text-center">
+                        <Button
+                          variant="outline"
+                          size="icon"
+                          onClick={() => handleEditClick(attendee)}
+                          className="h-9 w-9 rounded-lg border-[#E8EAEB]"
+                          disabled={quickActionMode !== null}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                      </td>
                     </tr>
                   )
                 })}

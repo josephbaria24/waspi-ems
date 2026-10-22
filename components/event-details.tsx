@@ -117,9 +117,9 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: ()
   }
 
   return (
-    <main className="min-h-[calc(100vh-4rem)] bg-[#F7FBF8] p-4 sm:p-6">
-      <div className="mx-auto max-w-7xl space-y-6">
-        <div className="relative overflow-hidden rounded-3xl bg-[#0B1F14] px-5 py-6 text-white sm:px-7">
+    <main className="min-h-[calc(100vh-4rem)] bg-[#F7FBF8] p-3 sm:p-4 lg:p-5">
+      <div className="mx-auto w-full max-w-none space-y-5">
+        <div className="relative overflow-hidden rounded-3xl bg-[#0B1F14] px-5 py-5 text-white sm:px-7">
           <div className="pointer-events-none absolute -right-10 -top-12 h-40 w-40 rounded-full bg-[#00D47E]/25" />
           <div className="pointer-events-none absolute -bottom-16 left-1/3 h-32 w-40 rounded-full bg-[#017C7C]/40" />
           <div className="relative flex items-start gap-4">
@@ -149,14 +149,18 @@ export function EventDetails({ eventId, onBack }: { eventId: string; onBack?: ()
           </div>
         </div>
 
-        {/* Two Column Layout */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+        {/* Event details fixed width; attendance takes remaining screen width */}
+        <div className="grid grid-cols-1 items-stretch gap-5 lg:grid-cols-[34rem_minmax(0,1fr)] xl:grid-cols-[36rem_minmax(0,1fr)]">
           <EventDetailsCard event={event} onAttendeeAdded={handleRefresh} onUpdated={handleRefresh} />
-          <AttendeesList
-            eventId={eventId}
-            scheduleDates={event.schedule.map((s) => ({ date: s.date }))}
-            refreshKey={refreshKey}
-          />
+          <div className="relative min-h-[28rem] min-w-0 lg:min-h-0">
+            <div className="lg:absolute lg:inset-0">
+              <AttendeesList
+                eventId={eventId}
+                scheduleDates={event.schedule.map((s) => ({ date: s.date }))}
+                refreshKey={refreshKey}
+              />
+            </div>
+          </div>
         </div>
       </div>
     </main>
