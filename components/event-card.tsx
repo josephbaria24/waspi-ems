@@ -1,6 +1,6 @@
 "use client"
 
-import { Archive, Calendar, Clock, MapPin, MoreHorizontal, Power, Trash2 } from "lucide-react"
+import { Archive, Calendar, Clock, MapPin, MoreHorizontal, Power, Trash2, Users } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -101,6 +101,11 @@ export function EventCard({
             {timeLabel}
           </span>
         </div>
+
+        <p className="mt-3 inline-flex items-center gap-1.5 text-sm font-medium text-[#1E1E1E]">
+          <Users className="h-4 w-4 text-[#F97316]" />
+          {Number(event.attendees?.registered || 0).toLocaleString()} registered
+        </p>
 
         <div className="mt-5 flex gap-2">
           <button

@@ -2,7 +2,8 @@
 "use client"
 
 import { useEffect, useState, useRef, useCallback } from "react"
-import { useSearchParams } from "next/navigation"
+import Link from "next/link"
+import { useRouter, useSearchParams } from "next/navigation"
 import { supabase } from "@/lib/supabase-client"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -13,6 +14,34 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, CheckCircle2, Upload, Edit2, X, Crop, UserCog } from "lucide-react"
 import { useToast } from "@/hooks/use-toast"
 import { aliasesContainsFilter, eventHasSlug, normalizeRegistrationSlug } from "@/lib/event-slugs"
+import { type MembershipPlan } from "@/lib/membership-settings"
+
+function formatMembershipPrice(amount: number) {
+  const value = Number(amount || 0)
+  const hasCents = Math.round(value * 100) % 100 !== 0
+  return `₱${value.toLocaleString("en-PH", {
+    minimumFractionDigits: hasCents ? 2 : 0,
+    maximumFractionDigits: 2,
+  })}`
+}
+
+const membershipTierStyle = {
+  standard: {
+    metal: "Silver",
+    card: "bg-[linear-gradient(165deg,#F7F8FA_0%,#D7DDE3_58%,#B8C1C9_100%)] text-[#1C2430]",
+    muted: "text-[#3E4A59]",
+  },
+  premium: {
+    metal: "Gold",
+    card: "bg-[linear-gradient(165deg,#FBE7A1_0%,#E0B03A_50%,#C48A1A_100%)] text-[#3A2808]",
+    muted: "text-[#5C4010]",
+  },
+  elite: {
+    metal: "Black",
+    card: "bg-[linear-gradient(165deg,#3A3A3A_0%,#171717_58%,#070707_100%)] text-white",
+    muted: "text-white/70",
+  },
+} as const
 
 interface CropArea {
   x: number
@@ -38,10 +67,14 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
   const [submitting, setSubmitting] = useState(false)
   const submitLock = useRef(false)
   const [submitted, setSubmitted] = useState(false)
+  const [redirectSeconds, setRedirectSeconds] = useState(5)
+  const redirectStarted = useRef(false)
   const [isAdmin, setIsAdmin] = useState(false)
   const [editMode, setEditMode] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [dataPrivacyAgreed, setDataPrivacyAgreed] = useState(false)
+  const [membershipPlans, setMembershipPlans] = useState<MembershipPlan[] | null>(null)
+  const [showMembershipDetails, setShowMembershipDetails] = useState(false)
   const [showCropModal, setShowCropModal] = useState(false)
   const [imageToCrop, setImageToCrop] = useState<string | null>(null)
   const [originalFile, setOriginalFile] = useState<File | null>(null)
@@ -54,6 +87,7 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
   const cropImageRef = useRef<HTMLImageElement>(null)
 
   const { toast } = useToast()
+  const router = useRouter()
 
   const [formData, setFormData] = useState({
     personal_name: "",
@@ -70,6 +104,46 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
 
   const searchParams = useSearchParams()
   const ref = eventRef || searchParams.get("ref")
+
+  useEffect(() => {
+    if (!submitted) {
+      redirectStarted.current = false
+      return
+    }
+
+    const startedAt = Date.now()
+    setRedirectSeconds(5)
+    const timer = window.setInterval(() => {
+      const remaining = Math.ceil((5000 - (Date.now() - startedAt)) / 1000)
+      if (remaining <= 0) {
+        window.clearInterval(timer)
+        setRedirectSeconds(0)
+        if (!redirectStarted.current) {
+          redirectStarted.current = true
+          router.push("/")
+        }
+        return
+      }
+      setRedirectSeconds(remaining)
+    }, 200)
+
+    return () => window.clearInterval(timer)
+  }, [submitted, router])
+
+  useEffect(() => {
+    let cancelled = false
+    fetch("/api/membership/settings", { cache: "no-store" })
+      .then((response) => response.json())
+      .then((data) => {
+        if (!cancelled && Array.isArray(data.settings?.plans)) {
+          setMembershipPlans(data.settings.plans)
+        }
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -423,6 +497,7 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
             body: JSON.stringify({
               email: attendee.email,
               name: `${attendee.personal_name} ${attendee.last_name}`,
+              attendee_id: attendee.id,
               reference_id: attendee.reference_id,
               event_name: event.name,
               venue: event.venue,
@@ -518,6 +593,11 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
                 </p>
                 <p className="text-[#8D959D]">
                   We'll see you soon!
+                </p>
+                <p className="pt-2 text-sm font-medium text-[#0B1F14]">
+                  {redirectSeconds > 0
+                    ? `Redirecting to the homepage in ${redirectSeconds} ${redirectSeconds === 1 ? "second" : "seconds"}.`
+                    : "Redirecting to the homepage now."}
                 </p>
               </div>
 
@@ -623,7 +703,7 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
         </div>
       )}
 
-      <Card className="w-full max-w-2xl overflow-hidden rounded-3xl border border-[#E8EAEB] bg-white shadow-sm">
+      <Card className="w-full max-w-2xl gap-0 overflow-hidden rounded-3xl border border-[#E8EAEB] bg-white py-0 shadow-sm">
         {(event.feature_image || (isAdmin && editMode)) && (
           <div className="relative">
             {event.feature_image ? (
@@ -887,6 +967,58 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
                 <span className="font-semibold text-red-600">*</span>
               </span>
             </label>
+
+            <button
+              type="button"
+              onClick={() => setShowMembershipDetails((open) => !open)}
+              aria-expanded={showMembershipDetails}
+              aria-controls="waspi-membership-details"
+              className="block w-full cursor-pointer overflow-hidden rounded-2xl bg-[#0B1F14] p-0 text-left"
+            >
+              <img
+                src="/Authentic%20Filipino%20workplace%20safety%20team.png"
+                alt="Be a safety advocate. Join WASPI today. Student, Professional, and Organizational membership."
+                className="h-auto w-full"
+              />
+            </button>
+            {showMembershipDetails && (
+              <section id="waspi-membership-details" aria-label="WASPI membership" className="overflow-hidden rounded-2xl bg-[#0B1F14] p-3 text-white">
+                <div className="flex items-baseline justify-between gap-3 px-1 pb-3">
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-[#00D47E]">Member benefits</p>
+                  <p className="text-xs text-white/60">Prices per year</p>
+                </div>
+                {membershipPlans && membershipPlans.length > 0 ? (
+                  <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    {membershipPlans.map((plan) => {
+                      const tier = membershipTierStyle[plan.id] || membershipTierStyle.standard
+                      return (
+                        <article key={plan.id} className={`flex min-h-full flex-col rounded-xl px-3 py-3 ${tier.card}`}>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.18em]">WASPI</p>
+                          <p className={`text-[10px] font-medium uppercase tracking-[0.22em] ${tier.muted}`}>{tier.metal}</p>
+                          <h3 className="mt-2 text-sm font-semibold leading-5">{plan.name}</h3>
+                          <p className="mt-1 text-lg font-semibold leading-none">{formatMembershipPrice(plan.price)}</p>
+                          <ul className={`mt-3 space-y-1.5 text-xs leading-4 ${tier.muted}`}>
+                            {plan.benefits.map((benefit, index) => (
+                              <li key={`${plan.id}-${index}`}>{benefit}</li>
+                            ))}
+                          </ul>
+                        </article>
+                      )
+                    })}
+                  </div>
+                ) : (
+                  <p className="px-1 pb-1 text-sm text-white/70">Membership plans are loading.</p>
+                )}
+                <Button
+                  asChild
+                  className="mt-3 h-11 w-full rounded-full bg-white font-semibold text-[#0B1F14] hover:bg-[#E8EAEB]"
+                >
+                  <Link href="/register" target="_blank" rel="noopener noreferrer">
+                    Become a Member
+                  </Link>
+                </Button>
+              </section>
+            )}
 
             <Button
               type="submit"

@@ -316,6 +316,7 @@ export function AttendeesList({ eventId, scheduleDates, refreshKey }: { eventId:
           body: JSON.stringify({
             email: attendee.email,
             name: attendee.name,
+            attendee_id: attendee.id,
             reference_id: attendee.reference_id,
             event_name: eventName,
             venue: venue,

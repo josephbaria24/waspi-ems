@@ -14,6 +14,7 @@ import jsQR from 'jsqr';
 // @ts-ignore
 import { supabase } from '@/lib/supabase-client';
 import { attendanceMatchesDate, localDateKey, scheduleDateEpoch } from '@/lib/attendance-date';
+import { chooseAttendee, parseAttendeeQr } from '@/lib/attendee-qr';
 
 export function QRScanner({ eventId = "1" }: { eventId?: string }) {
   const [scanning, setScanning] = useState(false);
@@ -238,37 +239,85 @@ export function QRScanner({ eventId = "1" }: { eventId?: string }) {
     }
   };
 
-  const extractReferenceId = (raw: string) => {
-    const value = raw.trim()
-    const fromUrl = value.match(/\/submission\/([^/?#]+)/i)?.[1]
-    return decodeURIComponent(fromUrl || value).trim()
-  }
-
   const processQRCode = async (rawCode: string) => {
     try {
-      const referenceId = extractReferenceId(rawCode)
-      console.log('Processing QR code for reference_id:', referenceId);
+      const parsed = parseAttendeeQr(rawCode)
+      console.log('Processing QR code:', parsed);
 
-      const eventNumber = Number(eventId)
-      const { data: matches, error: fetchError } = await supabase
-        .from('attendees')
-        .select('*')
-        .ilike('reference_id', referenceId)
-        .order('id', { ascending: false })
-
-      if (fetchError) {
-        console.error('Attendee lookup failed:', fetchError);
+      if (!parsed.referenceId && !parsed.attendeeId && !parsed.name && !parsed.email) {
+        setLastScan({
+          status: 'error',
+          message: 'This QR code does not contain an attendee',
+          time: new Date()
+        });
+        playSound(400, 0.2);
+        return;
       }
 
-      const rows = matches || []
-      const attendee = rows.find((row: { event_id?: number | string }) => Number(row.event_id) === eventNumber) || null
+      const eventNumber = Number(eventId)
+      let attendee: any = null
+      let otherEvent = false
+
+      if (parsed.attendeeId) {
+        const { data, error: idError } = await supabase
+          .from('attendees')
+          .select('*')
+          .eq('id', parsed.attendeeId)
+          .maybeSingle()
+
+        if (idError) console.error('Attendee lookup failed:', idError);
+        if (data) {
+          if (Number(data.event_id) === eventNumber) attendee = data
+          else otherEvent = true
+        }
+      }
+
+      if (!attendee && !otherEvent) {
+        let rows: any[] = []
+        if (parsed.referenceId) {
+          const { data: matches, error: fetchError } = await supabase
+            .from('attendees')
+            .select('*')
+            .ilike('reference_id', parsed.referenceId)
+            .order('id', { ascending: false })
+
+          if (fetchError) console.error('Attendee lookup failed:', fetchError);
+          const allMatches = matches || []
+          rows = allMatches.filter((row: { event_id?: number | string }) => Number(row.event_id) === eventNumber)
+          otherEvent = allMatches.length > 0 && rows.length === 0
+        }
+
+        if (!rows.length && !otherEvent && (parsed.name || parsed.email)) {
+          const { data: eventRows, error: eventError } = await supabase
+            .from('attendees')
+            .select('*')
+            .eq('event_id', eventNumber)
+
+          if (eventError) console.error('Attendee lookup failed:', eventError);
+          rows = eventRows || []
+        }
+
+        const picked = chooseAttendee(rows, parsed)
+        if (picked.attendee) attendee = picked.attendee
+        else if (!otherEvent) {
+          setLastScan({
+            status: 'error',
+            message: picked.error || 'Attendee not found or not registered for this event',
+            name: parsed.name,
+            time: new Date()
+          });
+          playSound(400, 0.2);
+          return;
+        }
+      }
 
       if (!attendee) {
         setLastScan({
           status: 'error',
-          message: rows.length
+          message: otherEvent
             ? 'This attendee is registered for a different event'
             : 'Attendee not found or not registered for this event',
+          name: parsed.name,
           time: new Date()
         });
         playSound(400, 0.2);

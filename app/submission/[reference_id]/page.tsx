@@ -5,9 +5,12 @@ import { supabaseServer } from "@/lib/supabase-server"
 import QRCode from "qrcode"
 import Image from "next/image"
 import TicketDownloadButton from "@/components/ticket-download-button"
+import { attendeeDisplayName, buildAttendeeQrValue } from "@/lib/attendee-qr"
 
 interface Attendee {
+  id: number
   personal_name: string
+  middle_name?: string | null
   last_name: string
   email: string
   reference_id: string
@@ -39,7 +42,7 @@ export default async function SubmissionPage(props: {
 
   const { data: matches, error: attendeeError } = await supabaseServer
     .from("attendees")
-    .select("personal_name, last_name, email, reference_id, event_id")
+    .select("id, personal_name, middle_name, last_name, email, reference_id, event_id")
     .eq("reference_id", ref)
     .order("id", { ascending: false })
     .limit(1)
@@ -75,14 +78,24 @@ export default async function SubmissionPage(props: {
     )
   }
 
-  const qrCode = await QRCode.toDataURL(attendee.reference_id, {
-    width: 200,
-    margin: 2,
-    color: {
-      dark: "#000000",
-      light: "#ffffff"
-    }
-  })
+  const displayName = attendeeDisplayName(attendee)
+  const qrCode = await QRCode.toDataURL(
+    buildAttendeeQrValue({
+      attendeeId: attendee.id,
+      referenceId: attendee.reference_id,
+      name: displayName,
+      email: attendee.email,
+    }),
+    {
+      width: 280,
+      margin: 1,
+      errorCorrectionLevel: "M",
+      color: {
+        dark: "#000000",
+        light: "#ffffff",
+      },
+    },
+  )
 
   return (
     <main className="flex justify-center items-center min-h-screen p-4" style={{ background: 'linear-gradient(to bottom right, #1e3a8a, #047857, #1e3a8a)' }}>
@@ -167,11 +180,14 @@ export default async function SubmissionPage(props: {
             <div className="p-4 rounded-2xl shadow-lg" style={{ backgroundColor: '#ffffff' }}>
               <Image
                 src={qrCode}
-                alt="QR Code"
+                alt={`QR code for ${displayName}`}
                 width={200}
                 height={200}
                 className="rounded-lg"
               />
+              <p className="mt-3 text-center text-sm font-semibold" style={{ color: "#111827" }}>
+                {displayName}
+              </p>
             </div>
           </div>
 

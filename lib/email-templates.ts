@@ -19,6 +19,7 @@ export type EmailBlock = {
 
 export type EmailTemplateKey =
   | "registration_confirmation"
+  | "event_info"
   | "evaluation_invite"
   | "certificate_participation"
   | "certificate_direct"
@@ -50,6 +51,7 @@ export const EMAIL_VARIABLES = [
   { key: "link", label: "Registration link" },
   { key: "eval_link", label: "Evaluation link" },
   { key: "certificate_label", label: "Certificate type" },
+  { key: "agenda", label: "Agenda and schedule" },
   { key: "year", label: "Current year" },
 ] as const
 
@@ -86,6 +88,27 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
         block("divider"),
         block("qr"),
         block("info", { text: "Event: {{event_name}}\nVenue: {{venue}}\nReference ID: {{reference_id}}" }),
+        block("footer", {
+          text: "If you have any questions, please don't hesitate to contact info@waspi.ph.",
+        }),
+      ],
+    },
+    event_info: {
+      key: "event_info",
+      name: "Event info",
+      description: "Sends the agenda, venue, and this attendee's personal QR code.",
+      enabled: true,
+      subject: "Event information - {{event_name}}",
+      fromName: "WASPI",
+      blocks: [
+        block("logo"),
+        block("heading", { text: "Hi, {{name}}!" }),
+        block("paragraph", {
+          text: "Here are the details for <strong>{{event_name}}</strong>. Your QR code below is issued to <strong>{{name}}</strong> only.",
+        }),
+        block("info", { text: "Venue: {{venue}}\nReference: {{reference_id}}\n\nAgenda:\n{{agenda}}" }),
+        block("qr"),
+        block("button", { label: "View your ticket", url: "{{link}}", tone: "primary" }),
         block("footer", {
           text: "If you have any questions, please don't hesitate to contact info@waspi.ph.",
         }),
@@ -174,6 +197,7 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
   return {
     order: [
       "registration_confirmation",
+      "event_info",
       "evaluation_invite",
       "certificate_participation",
       "certificate_direct",
@@ -220,6 +244,14 @@ export function fillTemplate(input: string, vars: EmailVars) {
   })
 }
 
+function escapeHtml(value: string) {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+}
+
 function buttonColor(tone?: EmailBlock["tone"]) {
   if (tone === "dark") return "#0B1F14"
   if (tone === "muted") return "#8D959D"
@@ -234,7 +266,7 @@ function buttonTextColor(tone?: EmailBlock["tone"]) {
 export function renderEmailBlocksHtml(
   blocks: EmailBlock[],
   vars: EmailVars,
-  options?: { qrDataUrl?: string; logoUrl?: string; preview?: boolean },
+  options?: { qrDataUrl?: string; qrCaption?: string; logoUrl?: string; preview?: boolean },
 ) {
   const logoUrl =
     options?.logoUrl ||
@@ -274,8 +306,13 @@ export function renderEmailBlocksHtml(
           return `<p style="color:#8D959D;font-size:13px;">[QR code will appear here when sent]</p>`
         }
         return `
-          <div style="margin:16px 0;">
-            <img src="${options.qrDataUrl}" alt="QR Code" width="120" height="120" style="display:block;" />
+          <div style="margin:16px 0;text-align:center;">
+            <img src="${options.qrDataUrl}" alt="${escapeHtml(options.qrCaption || "QR Code")}" width="180" height="180" style="display:inline-block;" />
+            ${
+              options.qrCaption
+                ? `<p style="margin:8px 0 0;color:#0B1F14;font-size:14px;font-weight:700;">${escapeHtml(options.qrCaption)}</p>`
+                : ""
+            }
           </div>`
       case "footer":
         return `<p style="margin-top:28px;color:#666;font-size:13px;">${text}<br/>© ${vars.year || new Date().getFullYear()} WASPI. All rights reserved.</p>`
@@ -296,7 +333,7 @@ export function renderEmailBlocksHtml(
 export function renderEmailTemplate(
   template: EmailTemplate,
   vars: EmailVars,
-  options?: { qrDataUrl?: string; logoUrl?: string; preview?: boolean },
+  options?: { qrDataUrl?: string; qrCaption?: string; logoUrl?: string; preview?: boolean },
 ) {
   const withYear = { year: String(new Date().getFullYear()), ...vars }
   return {

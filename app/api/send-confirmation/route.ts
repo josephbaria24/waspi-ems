@@ -1,15 +1,26 @@
 import nodemailer from "nodemailer"
 import QRCode from "qrcode"
 import { NextResponse } from "next/server"
+import { buildAttendeeQrValue } from "@/lib/attendee-qr"
 import { renderEmailTemplate } from "@/lib/email-templates"
 import { loadEventEmailTemplate } from "@/lib/load-event-email-template"
 
 export async function POST(req: Request) {
   const body = await req.json()
-  const { email, name, reference_id, event_name, venue, link, event_id } = body
+  const { email, name, reference_id, event_name, venue, link, event_id, attendee_id } = body
 
   try {
-    const qrCodeDataUrl = await QRCode.toDataURL(reference_id)
+    const qrValue = buildAttendeeQrValue({
+      referenceId: reference_id,
+      name: String(name || ""),
+      email: String(email || ""),
+      attendeeId: attendee_id ? Number(attendee_id) : undefined,
+    })
+    const qrCodeDataUrl = await QRCode.toDataURL(qrValue, {
+      width: 280,
+      margin: 1,
+      errorCorrectionLevel: "M",
+    })
 
     const transporter = nodemailer.createTransport({
       host: "smtp.hostinger.com",
@@ -41,7 +52,7 @@ export async function POST(req: Request) {
         reference_id: String(reference_id || ""),
         link: String(link || "#"),
       },
-      { qrDataUrl: qrCodeDataUrl },
+      { qrDataUrl: qrCodeDataUrl, qrCaption: String(name || "") },
     )
 
     await transporter.sendMail({

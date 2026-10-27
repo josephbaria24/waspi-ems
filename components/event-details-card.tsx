@@ -2,7 +2,7 @@
 "use client"
 
 import { useEffect, useState } from "react"
-import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus, BookOpen, GraduationCap, Video, Trash2, X, Link2, Copy, ExternalLink, Mails } from "lucide-react"
+import { Edit2, MoreVertical, FileUp, Award, Download, BarChart3, Upload, UserPlus, Mail, Palette, Users, CheckCircle2, CreditCard, CalendarDays, Clock, MapPin, Plus, BookOpen, GraduationCap, Video, Trash2, X, Link2, Copy, ExternalLink, Mails, QrCode, ChevronRight } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
@@ -15,6 +15,7 @@ import DownloadCertificatesModal from "@/components/download-certificates-modal"
 import SendDirectCertificateModal from "@/components/send-direct-certificate-modal"
 import AddAttendeeModal from "@/components/add-attendee-modal"
 import EditEmailsModal from "@/components/edit-emails-modal"
+import SendAttendeeEmailModal from "@/components/send-attendee-email-modal"
 import { supabase } from "@/lib/supabase-client"
 import { EventCoverCrop } from "@/components/event-cover-crop"
 import { normalizeRegistrationSlug, normalizeSlugList, registrationPath } from "@/lib/event-slugs"
@@ -150,6 +151,9 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
   const [showSendDirectCertificateModal, setShowSendDirectCertificateModal] = useState(false)
   const [showAddAttendeeModal, setShowAddAttendeeModal] = useState(false)
   const [showEditEmailsModal, setShowEditEmailsModal] = useState(false)
+  const [showSendQrModal, setShowSendQrModal] = useState(false)
+  const [showSendEventInfoModal, setShowSendEventInfoModal] = useState(false)
+  const [sendEmailsOpen, setSendEmailsOpen] = useState(false)
 
   const runAction = (label: string) => {
     if (label === "Open Registration") {
@@ -173,13 +177,18 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
     { label: "Open Registration", icon: ExternalLink, className: "bg-[#0B1F14] text-white hover:bg-[#163525]" },
     { label: "Add New Attendee", icon: UserPlus, className: "bg-[#00D47E] text-[#0B1F14] hover:bg-[#00c174]" },
     { label: "Export Attendees", icon: Download, className: "border border-[#017C7C]/30 bg-[#E8F5F5] text-[#017C7C] hover:bg-[#d7eeee]" },
-    { label: "Send Evaluations", icon: Mail, className: "border border-amber-200 bg-amber-50 text-amber-800 hover:bg-amber-100" },
+  ]
+
+  const emailActions = [
+    { label: "Send direct certificate", icon: Award, run: () => setShowSendDirectCertificateModal(true) },
+    { label: "Send evaluation", icon: Mail, run: () => setShowSendEvaluationsModal(true) },
+    { label: "Resend QR code", icon: QrCode, run: () => setShowSendQrModal(true) },
+    { label: "Send event info", icon: CalendarDays, run: () => setShowSendEventInfoModal(true) },
   ]
 
   const moreActions = [
     { label: "Edit Emails", icon: Mails },
     { label: "Edit Certificate Template", icon: Palette },
-    { label: "Send Direct Certificate", icon: Award },
     { label: "Download Certificates", icon: Award },
     { label: "Download Badges", icon: FileUp },
     { label: "Show Evaluation Results", icon: BarChart3 },
@@ -215,14 +224,16 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
         {!isEditing && (
           <div className="space-y-2">
             <div className="grid grid-cols-2 gap-2">
-              {primaryActions.map((action) => {
+              {primaryActions.map((action, index) => {
                 const Icon = action.icon
                 return (
                   <button
                     key={action.label}
                     type="button"
                     onClick={() => runAction(action.label)}
-                    className={`flex h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${action.className}`}
+                    className={`flex h-11 items-center justify-center gap-2 rounded-xl px-3 text-sm font-semibold transition ${
+                      primaryActions.length % 2 === 1 && index === primaryActions.length - 1 ? "col-span-2" : ""
+                    } ${action.className}`}
                   >
                     <Icon className="h-4 w-4 shrink-0" />
                     <span className="truncate">{action.label}</span>
@@ -230,17 +241,45 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
                 )
               })}
             </div>
-            <DropdownMenu>
+            <DropdownMenu onOpenChange={(open) => { if (!open) setSendEmailsOpen(false) }}>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" className="h-10 w-full justify-between rounded-xl border-[#E8EAEB] bg-white font-medium text-[#1E1E1E] hover:bg-white">
                   <span className="inline-flex items-center gap-2">
                     <MoreVertical className="h-4 w-4 text-[#017C7C]" />
                     More tools
                   </span>
-                  <span className="rounded-md bg-[#0B1F14] px-2 py-0.5 text-xs font-semibold text-white">{moreActions.length}</span>
+                  <span className="rounded-md bg-[#0B1F14] px-2 py-0.5 text-xs font-semibold text-white">{moreActions.length + 1}</span>
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-64">
+                <DropdownMenuItem
+                  className="cursor-pointer py-2.5"
+                  onSelect={(event) => {
+                    event.preventDefault()
+                    setSendEmailsOpen((open) => !open)
+                  }}
+                >
+                  <Mails className="mr-2 h-4 w-4" />
+                  <span>Send emails</span>
+                  <ChevronRight className={`ml-auto h-4 w-4 transition-transform ${sendEmailsOpen ? "rotate-90" : ""}`} />
+                </DropdownMenuItem>
+                {sendEmailsOpen && (
+                  <div className="mx-1 mb-1 space-y-0.5 rounded-lg bg-[#E8F5F5] p-1">
+                    {emailActions.map((action) => {
+                      const Icon = action.icon
+                      return (
+                        <DropdownMenuItem
+                          key={action.label}
+                          className="cursor-pointer rounded-md bg-[#E8F5F5] py-2.5 pl-7 text-[#017C7C] focus:bg-[#d7eeee] focus:text-[#017C7C]"
+                          onClick={action.run}
+                        >
+                          <Icon className="mr-2 h-4 w-4 text-[#017C7C]" />
+                          <span>{action.label}</span>
+                        </DropdownMenuItem>
+                      )
+                    })}
+                  </div>
+                )}
                 {moreActions.map((action) => {
                   const Icon = action.icon
                   return (
@@ -802,6 +841,26 @@ export function EventDetailsCard({ event, onAttendeeAdded, onUpdated }: { event:
         eventName={event.name}
         open={showEditEmailsModal}
         onClose={() => setShowEditEmailsModal(false)}
+      />
+
+      <SendAttendeeEmailModal
+        eventId={Number(event.id)}
+        open={showSendQrModal}
+        onClose={() => setShowSendQrModal(false)}
+        title="Resend QR code"
+        description="Each person gets a QR labeled with their own name. Two people who share an old code still check in separately."
+        actionLabel="Send QR codes"
+        kind="qr"
+      />
+
+      <SendAttendeeEmailModal
+        eventId={Number(event.id)}
+        open={showSendEventInfoModal}
+        onClose={() => setShowSendEventInfoModal(false)}
+        title="Send event info"
+        description="Sends the venue, agenda, and a QR code issued to that attendee."
+        actionLabel="Send event info"
+        kind="event_info"
       />
     </Card>
   )

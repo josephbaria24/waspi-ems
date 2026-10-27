@@ -3,12 +3,13 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { LandingSection } from '@/components/landing-section'
 import MagicBento, { type BentoCardProps } from '@/components/MagicBento'
-import GradualBlur from '@/components/GradualBlur'
 import ScrollVelocity from '@/components/ScrollVelocity'
 import ScrollFloat from '@/components/ScrollFloat'
 import MergedShape from '@/components/MergedShape'
 import BorderGlow from '@/components/BorderGlow'
 import StickyCardNav from '@/components/StickyCardNav'
+import { registrationPath } from '@/lib/event-slugs'
+import { supabaseServer } from '@/lib/supabase-server'
 
 const MARQUEE_LINE_1 = (
   <span className="inline-flex flex-wrap items-baseline gap-x-0.5">
@@ -80,7 +81,57 @@ const palette = {
 
 const typeStyle = { fontFamily: 'Aeonik, Geist, -apple-system, BlinkMacSystemFont, sans-serif' }
 
-export default function Home() {
+type UpcomingEvent = {
+  name: string
+  venue: string
+  price: number
+  start_date: string
+  end_date: string
+  feature_image?: string | null
+  description?: string | null
+  magic_link?: string | null
+  status?: string | null
+}
+
+function formatEventRange(start?: string, end?: string) {
+  if (!start) return ''
+  const startDate = new Date(start)
+  const endDate = end ? new Date(end) : startDate
+  if (Number.isNaN(startDate.getTime())) return ''
+  const sameDay = startDate.toDateString() === endDate.toDateString()
+  if (sameDay) {
+    return startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  }
+  const sameMonth = startDate.getMonth() === endDate.getMonth() && startDate.getFullYear() === endDate.getFullYear()
+  if (sameMonth) {
+    const month = startDate.toLocaleDateString('en-US', { month: 'short' })
+    return `${month} ${startDate.getDate()}–${endDate.getDate()}, ${endDate.getFullYear()}`
+  }
+  const startLabel = startDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  const endLabel = endDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+  return `${startLabel} – ${endLabel}`
+}
+
+async function getUpcomingEvent() {
+  const { data, error } = await supabaseServer
+    .from('events')
+    .select('name, venue, price, start_date, end_date, feature_image, description, magic_link, status')
+    .gte('end_date', new Date().toISOString())
+    .order('start_date', { ascending: true })
+    .limit(8)
+
+  if (error || !Array.isArray(data)) return null
+  const hidden = new Set(['completed', 'archived', 'inactive'])
+  const event = (data as UpcomingEvent[]).find((item) => !hidden.has(String(item.status || '').toLowerCase()))
+  return event || null
+}
+
+export default async function Home() {
+  const upcoming = await getUpcomingEvent()
+  const eventWhen = upcoming ? formatEventRange(upcoming.start_date, upcoming.end_date) : ''
+  const eventPrice = Number(upcoming?.price || 0)
+  const registerHref = registrationPath(upcoming?.magic_link || '')
+  const conventionBanner = '/2026%20-%20WASPI%20National%20Occupational%20Safety%20and%20Health%20Convention.png'
   return (
     <main className="dot-grid-bg mx-auto min-h-screen w-[98vw] bg-white p-0 sm:w-[90vw]" style={typeStyle}>
       <StickyCardNav />
@@ -95,55 +146,75 @@ export default function Home() {
             fillOpacity={0.25}
             colors={['#22c55e', '#14b8a6', '#38bdf8']}
           >
-            <MergedShape className="relative min-h-[460px] md:min-h-[500px]" cutoutClassName="hidden xl:block">
+            <MergedShape className="relative min-h-[460px] bg-[#05240f] md:min-h-[500px]" cutoutClassName="hidden xl:block">
               <Image
-                src="/waspi-event.png"
-                alt="WASPI conference event"
+                src={conventionBanner}
+                alt=""
                 fill
                 priority
-                className="object-cover"
+                className="object-cover object-top"
                 sizes="(max-width: 768px) 98vw, (max-width: 1280px) 90vw, 1120px"
               />
-              <div className="absolute inset-0 bg-gradient-to-r from-black/70 via-black/40 to-black/20" />
-              <GradualBlur
-                target="parent"
-                position="bottom"
-                height="7rem"
-                strength={2}
-                divCount={5}
-                curve="bezier"
-                exponential
-                opacity={1}
-                zIndex={8}
-              />
+              <div className="absolute inset-0 bg-gradient-to-r from-black/65 via-black/35 to-black/10" />
               <div className="relative z-10">
-                <div className="px-4 pb-6 pt-10 sm:px-10 sm:pb-8 sm:pt-16 lg:px-14 xl:pb-16">
-                  <div className="w-full max-w-none space-y-5 sm:max-w-3xl">
-                    <p className="text-xs uppercase tracking-[0.2em] text-white/85">Workplace safety membership</p>
-                    <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl lg:text-6xl">
-                      Protecting Filipino Workers Through Unified Safety Action
+                <div className="px-4 pb-6 pt-24 sm:px-10 sm:pb-8 sm:pt-28 lg:px-14 lg:pt-32 xl:pb-16">
+                  <div className="w-full max-w-none space-y-5 sm:max-w-3xl xl:max-w-[46%]">
+                    {upcoming ? (
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/85">
+                        Upcoming event{eventWhen ? ` · ${eventWhen}` : ''}
+                      </p>
+                    ) : (
+                      <p className="text-xs uppercase tracking-[0.2em] text-white/85">Workplace safety membership</p>
+                    )}
+                    <h1 className="text-4xl font-semibold leading-tight text-white sm:text-5xl">
+                      {upcoming ? upcoming.name : 'Protecting Filipino Workers Through Unified Safety Action'}
                     </h1>
                     <p className="w-full max-w-none text-sm leading-relaxed text-white/80 sm:max-w-xl sm:text-base">
-                      A non-stock, non-profit, non-government occupational safety and health advocacy group of
-                      professionals and entrepreneurs passionate about Safe Work and Safe Workplaces.
+                      {upcoming
+                        ? [upcoming.venue, eventPrice > 0 ? `₱${eventPrice.toLocaleString('en-PH')}` : '']
+                            .filter(Boolean)
+                            .join(' · ')
+                        : 'A non-stock, non-profit, non-government occupational safety and health advocacy group of professionals and entrepreneurs passionate about Safe Work and Safe Workplaces.'}
                     </p>
-                    <div className="flex flex-wrap gap-4 pt-6 sm:pt-8">
-                      <Link href="/register">
-                        <Button
-                          className="rounded-full px-7 py-5 text-sm font-semibold text-black shadow-none hover:brightness-95"
-                          style={{ backgroundColor: palette.green }}
-                        >
-                          Become a Member
-                        </Button>
-                      </Link>
-                      <Link href="/membership/portal">
-                        <Button
-                          variant="outline"
-                          className="rounded-full border-white/40 bg-white/15 px-7 py-5 text-sm text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.35)] backdrop-blur-xl backdrop-saturate-150 hover:bg-white/25 hover:text-white"
-                        >
-                          Member Login
-                        </Button>
-                      </Link>
+                    {upcoming && (
+                      <p className="max-w-xl text-sm leading-relaxed text-white/75 sm:text-base">
+                        WASPI is a non-stock, non-profit occupational safety and health advocacy group.
+                      </p>
+                    )}
+                    <div className="flex flex-col items-start gap-4 pt-6 sm:pt-8">
+                      {upcoming && registerHref ? (
+                        <Link href={registerHref}>
+                          <Button
+                            className="rounded-full px-7 py-5 text-sm font-semibold text-black shadow-none hover:brightness-95"
+                            style={{ backgroundColor: palette.green }}
+                          >
+                            Register for this event
+                          </Button>
+                        </Link>
+                      ) : (
+                        <Link href="/register">
+                          <Button
+                            className="rounded-full px-7 py-5 text-sm font-semibold text-black shadow-none hover:brightness-95"
+                            style={{ backgroundColor: palette.green }}
+                          >
+                            Become a member
+                          </Button>
+                        </Link>
+                      )}
+                      <p className="text-sm text-white/80">
+                        {upcoming && registerHref ? (
+                          <>
+                            <span className="text-white/55">Membership </span>
+                            <Link href="/register" className="font-semibold text-white underline decoration-white/35 underline-offset-4 hover:decoration-white">
+                              Become a member
+                            </Link>
+                            <span className="px-2 text-white/35">·</span>
+                          </>
+                        ) : null}
+                        <Link href="/membership/portal" className="font-semibold text-white underline decoration-white/35 underline-offset-4 hover:decoration-white">
+                          Member login
+                        </Link>
+                      </p>
                     </div>
                   </div>
                 </div>

@@ -110,6 +110,7 @@ export default function EditEmailsModal({ eventId, eventName, open, onClose }: P
         link: "https://waspi.ph/demo",
         eval_link: "https://waspi.ph/evaluation/demo",
         certificate_label: "Participation",
+        agenda: "Day 1 — Oct 27, 2026\n09:00 – 17:00\nTopics: Opening, Workplace safety",
       },
       { preview: true },
     )
