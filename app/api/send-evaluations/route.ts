@@ -3,6 +3,8 @@ import nodemailer from "nodemailer"
 import { createClient } from "@supabase/supabase-js"
 import { renderEmailTemplate } from "@/lib/email-templates"
 import { loadEventEmailTemplate } from "@/lib/load-event-email-template"
+import { buildEventBannerMail } from "@/lib/event-banner-mail"
+import { markAttendeeEmailStatus } from "@/lib/email-status"
 
 // ✅ Setup Supabase (Server-side client)
 const supabase = createClient(
@@ -61,7 +63,7 @@ export async function POST(req: Request) {
     // 🧩 3. Get event details
     const { data: event } = await supabase
       .from("events")
-      .select("name")
+      .select("name, feature_image")
       .eq("id", eventId)
       .single()
 
@@ -70,6 +72,8 @@ export async function POST(req: Request) {
       process.env.NEXT_PUBLIC_SITE_URL ||
       req.headers.get("origin") ||
       "http://localhost:3000"
+
+    const banner = await buildEventBannerMail(event?.feature_image)
 
     // ✅ 4. Send evaluation emails with detailed tracking
     const successful: Array<{ id: number; name: string; email: string }> = []
@@ -125,13 +129,14 @@ export async function POST(req: Request) {
           eval_link: evalLink,
           link: evalLink,
           reference_id: attendee.reference_id || "",
-        })
+        }, { bannerSrc: banner?.src })
 
         const mailOptions = {
           from: `"${rendered.fromName}" <no-reply@waspi.ph>`,
           to: cleanEmail,
           subject: rendered.subject,
           html: rendered.html,
+          attachments: banner?.attachments || [],
         }
 
         await transporter.sendMail(mailOptions)
@@ -141,6 +146,8 @@ export async function POST(req: Request) {
           .from("attendees")
           .update({ hassentevaluation: true })
           .eq("id", attendee.id)
+
+        await markAttendeeEmailStatus(supabase, [attendee.id], "evaluation")
 
         successful.push({
           id: attendee.id,

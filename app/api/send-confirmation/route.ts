@@ -1,26 +1,42 @@
 import nodemailer from "nodemailer"
-import QRCode from "qrcode"
 import { NextResponse } from "next/server"
 import { buildAttendeeQrValue } from "@/lib/attendee-qr"
+import { buildAttendeeQrMail } from "@/lib/attendee-qr-mail"
+import { buildEventBannerMail } from "@/lib/event-banner-mail"
+import { markAttendeeEmailStatus } from "@/lib/email-status"
 import { renderEmailTemplate } from "@/lib/email-templates"
 import { loadEventEmailTemplate } from "@/lib/load-event-email-template"
+import { supabaseServer } from "@/lib/supabase-server"
 
 export async function POST(req: Request) {
   const body = await req.json()
   const { email, name, reference_id, event_name, venue, link, event_id, attendee_id } = body
 
   try {
+    const attendeeName = String(name || "")
     const qrValue = buildAttendeeQrValue({
       referenceId: reference_id,
-      name: String(name || ""),
+      name: attendeeName,
       email: String(email || ""),
       attendeeId: attendee_id ? Number(attendee_id) : undefined,
     })
-    const qrCodeDataUrl = await QRCode.toDataURL(qrValue, {
-      width: 280,
-      margin: 1,
-      errorCorrectionLevel: "M",
+    const qrMail = await buildAttendeeQrMail({
+      value: qrValue,
+      name: attendeeName || "Attendee",
+      eventName: String(event_name || ""),
+      referenceId: String(reference_id || ""),
     })
+
+    let featureImage = ""
+    if (event_id) {
+      const { data: eventRow } = await supabaseServer
+        .from("events")
+        .select("feature_image")
+        .eq("id", Number(event_id))
+        .maybeSingle()
+      featureImage = eventRow?.feature_image || ""
+    }
+    const banner = await buildEventBannerMail(featureImage)
 
     const transporter = nodemailer.createTransport({
       host: "smtp.hostinger.com",
@@ -52,7 +68,7 @@ export async function POST(req: Request) {
         reference_id: String(reference_id || ""),
         link: String(link || "#"),
       },
-      { qrDataUrl: qrCodeDataUrl, qrCaption: String(name || "") },
+      { qrCid: qrMail.cid, qrCaption: attendeeName, bannerSrc: banner?.src },
     )
 
     await transporter.sendMail({
@@ -60,7 +76,12 @@ export async function POST(req: Request) {
       to: email,
       subject: rendered.subject,
       html: rendered.html,
+      attachments: [...(banner?.attachments || []), ...qrMail.attachments],
     })
+
+    if (attendee_id) {
+      await markAttendeeEmailStatus(supabaseServer, [Number(attendee_id)], "qr")
+    }
 
     return NextResponse.json({ success: true })
   } catch (err: any) {

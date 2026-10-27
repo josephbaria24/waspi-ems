@@ -74,20 +74,16 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
       fromName: "WASPI Registration",
       blocks: [
         block("logo"),
-        block("heading", { text: "Hi, {{name}}!" }),
+        block("heading", { text: "Hi, {{name}}" }),
         block("paragraph", {
-          text: "We have received your registration for the <strong>{{event_name}}</strong>.",
+          text: "You're registered for <strong>{{event_name}}</strong>. Your entry QR code is below, and it belongs only to you.",
         }),
+        block("button", { label: "View your ticket", url: "{{link}}", tone: "primary" }),
         block("paragraph", {
-          text: "You may view your submission / QR code details by clicking the button below:",
+          text: "Bring this email, or the attached PNG or PDF, when you arrive.",
         }),
-        block("button", { label: "View Submission", url: "{{link}}", tone: "primary" }),
-        block("paragraph", {
-          text: "Kindly present your submission details on the day of the event to confirm your attendance.",
-        }),
-        block("divider"),
         block("qr"),
-        block("info", { text: "Event: {{event_name}}\nVenue: {{venue}}\nReference ID: {{reference_id}}" }),
+        block("info", { text: "Event: {{event_name}}\nVenue: {{venue}}\nReference: {{reference_id}}" }),
         block("footer", {
           text: "If you have any questions, please don't hesitate to contact info@waspi.ph.",
         }),
@@ -102,9 +98,9 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
       fromName: "WASPI",
       blocks: [
         block("logo"),
-        block("heading", { text: "Hi, {{name}}!" }),
+        block("heading", { text: "Hi, {{name}}" }),
         block("paragraph", {
-          text: "Here are the details for <strong>{{event_name}}</strong>. Your QR code below is issued to <strong>{{name}}</strong> only.",
+          text: "Here are your details for <strong>{{event_name}}</strong>. The QR code in this email is issued only to you.",
         }),
         block("info", { text: "Venue: {{venue}}\nReference: {{reference_id}}\n\nAgenda:\n{{agenda}}" }),
         block("qr"),
@@ -123,15 +119,11 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
       fromName: "WASPI",
       blocks: [
         block("logo"),
-        block("heading", { text: "Hi, {{name}}!" }),
+        block("heading", { text: "Hi, {{name}}" }),
         block("paragraph", {
-          text: "Congratulations for completing the <strong>{{event_name}}</strong>.",
+          text: "Thank you for joining <strong>{{event_name}}</strong>. A short evaluation unlocks your certificate.",
         }),
-        block("paragraph", {
-          text: "We would like to invite you to complete an evaluation about the said Conference. Once done, you will receive another email with your digital certificate copy.",
-        }),
-        block("paragraph", { text: "You may take the evaluation by clicking the button below. Thank you!" }),
-        block("button", { label: "Take Evaluation", url: "{{eval_link}}", tone: "dark" }),
+        block("button", { label: "Take the evaluation", url: "{{eval_link}}", tone: "dark" }),
         block("footer", {
           text: "If you have any questions, please don't hesitate to contact info@waspi.ph.",
         }),
@@ -146,12 +138,9 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
       fromName: "WASPI",
       blocks: [
         block("logo"),
-        block("heading", { text: "Congratulations, {{name}}!" }),
+        block("heading", { text: "Congratulations, {{name}}" }),
         block("paragraph", {
-          text: "Thank you for completing the evaluation for <strong>{{event_name}}</strong>.",
-        }),
-        block("paragraph", {
-          text: "Please find attached your <strong>Certificate of Participation</strong>.",
+          text: "Thank you for completing the evaluation for <strong>{{event_name}}</strong>. Your certificate is attached.",
         }),
         block("footer", {
           text: "If you have any questions, please don't hesitate to contact info@waspi.ph",
@@ -167,9 +156,9 @@ export function createDefaultEmailTemplates(): EmailTemplatesConfig {
       fromName: "WASPI",
       blocks: [
         block("logo"),
-        block("heading", { text: "Congratulations, {{name}}!" }),
+        block("heading", { text: "Congratulations, {{name}}" }),
         block("paragraph", {
-          text: "Please find attached your <strong>Certificate of {{certificate_label}}</strong> for <strong>{{event_name}}</strong>.",
+          text: "Your <strong>Certificate of {{certificate_label}}</strong> for <strong>{{event_name}}</strong> is attached.",
         }),
         block("footer", {
           text: "If you have any questions, please don't hesitate to contact info@waspi.ph.",
@@ -263,10 +252,45 @@ function buttonTextColor(tone?: EmailBlock["tone"]) {
   return "#ffffff"
 }
 
+function renderInfoCard(text: string) {
+  const chunks = text.split(/(<table class="waspi-agenda"[\s\S]*?<\/table>)/)
+  const rows: string[] = []
+
+  chunks.forEach((chunk, index) => {
+    if (chunk.startsWith('<table class="waspi-agenda"')) {
+      rows.push(`<div style="padding:8px 0 4px;">${chunk}</div>`)
+      return
+    }
+
+    const nextIsAgenda = chunks[index + 1]?.startsWith('<table class="waspi-agenda"')
+    const lines = chunk
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+
+    for (const line of lines) {
+      if (nextIsAgenda && /^agenda:?$/i.test(line)) continue
+      const labeled = line.match(/^([^:]{2,32}):\s*(.+)$/)
+      if (labeled) {
+        rows.push(`
+          <div style="padding:12px 0;border-bottom:1px solid #E3EFE8;">
+            <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#017C7C;font-weight:700;">${escapeHtml(labeled[1])}</div>
+            <div style="margin-top:3px;font-size:15px;line-height:1.45;color:#0B1F14;">${escapeHtml(labeled[2])}</div>
+          </div>`)
+      } else {
+        rows.push(`<p style="margin:10px 0;color:#1E1E1E;font-size:14px;line-height:1.5;">${escapeHtml(line)}</p>`)
+      }
+    }
+  })
+
+  if (!rows.length) return ""
+  return `<div style="margin:18px 0;padding:4px 16px 8px;background:#F7FBF8;border:1px solid #E3EFE8;border-radius:14px;">${rows.join("")}</div>`
+}
+
 export function renderEmailBlocksHtml(
   blocks: EmailBlock[],
   vars: EmailVars,
-  options?: { qrDataUrl?: string; qrCaption?: string; logoUrl?: string; preview?: boolean },
+  options?: { qrDataUrl?: string; qrCid?: string; qrCaption?: string; bannerSrc?: string; logoUrl?: string; preview?: boolean },
 ) {
   const logoUrl =
     options?.logoUrl ||
@@ -280,51 +304,66 @@ export function renderEmailBlocksHtml(
     switch (blockItem.type) {
       case "logo":
         return `
-          <div style="text-align:center;padding:8px 0 16px;">
-            <img src="${logoUrl}" alt="WASPI" style="max-height:64px;width:auto;" />
+          <div style="text-align:center;padding:4px 0 18px;">
+            <img src="${logoUrl}" alt="WASPI" style="max-height:52px;width:auto;border:0;" />
           </div>`
       case "heading":
-        return `<h2 style="margin:0 0 12px;color:#0B1F14;font-size:22px;">${text}</h2>`
+        return `<h1 style="margin:0 0 10px;color:#0B1F14;font-size:26px;line-height:1.25;font-weight:700;">${text}</h1>`
       case "paragraph":
-        return `<p style="margin:0 0 14px;color:#333;line-height:1.55;font-size:15px;">${text}</p>`
+        return `<p style="margin:0 0 14px;color:#3d4742;line-height:1.6;font-size:15px;">${text}</p>`
       case "button":
         return `
-          <div style="text-align:center;margin:20px 0;">
-            <a href="${url}" style="display:inline-block;background:${buttonColor(blockItem.tone)};color:${buttonTextColor(blockItem.tone)};padding:12px 22px;text-decoration:none;border-radius:8px;font-weight:700;">
+          <div style="text-align:center;margin:22px 0;">
+            <a href="${url}" style="display:inline-block;background:${buttonColor(blockItem.tone)};color:${buttonTextColor(blockItem.tone)};padding:13px 26px;text-decoration:none;border-radius:999px;font-weight:700;font-size:14px;">
               ${label || "Open"}
             </a>
           </div>`
       case "divider":
-        return `<hr style="border:none;border-top:1px solid #E8EAEB;margin:22px 0;" />`
+        return `<div style="height:1px;background:#E8EAEB;margin:22px 0;"></div>`
       case "info":
-        return `
-          <div style="background:#F7FBF8;border:1px solid #E8EAEB;border-radius:10px;padding:14px;margin:14px 0;color:#1E1E1E;font-size:14px;white-space:pre-line;">
-            ${text}
-          </div>`
-      case "qr":
-        if (!options?.qrDataUrl) {
-          return `<p style="color:#8D959D;font-size:13px;">[QR code will appear here when sent]</p>`
+        return renderInfoCard(text)
+      case "qr": {
+        const qrSrc = options?.qrCid ? `cid:${options.qrCid}` : options?.qrDataUrl
+        if (!qrSrc) {
+          return `<p style="margin:0 0 14px;color:#8D959D;font-size:13px;">Your QR code will appear here when the email is sent.</p>`
         }
         return `
-          <div style="margin:16px 0;text-align:center;">
-            <img src="${options.qrDataUrl}" alt="${escapeHtml(options.qrCaption || "QR Code")}" width="180" height="180" style="display:inline-block;" />
-            ${
-              options.qrCaption
-                ? `<p style="margin:8px 0 0;color:#0B1F14;font-size:14px;font-weight:700;">${escapeHtml(options.qrCaption)}</p>`
-                : ""
-            }
-          </div>`
+          <table role="presentation" align="center" cellpadding="0" cellspacing="0" style="margin:8px auto 18px;background:#F7FBF8;border:1px solid #D7EEE4;border-radius:16px;">
+            <tr>
+              <td style="padding:18px 28px 16px;text-align:center;">
+                <div style="font-size:11px;letter-spacing:0.08em;text-transform:uppercase;color:#017C7C;font-weight:700;">Your entry code</div>
+                <img src="${qrSrc}" alt="${escapeHtml(options?.qrCaption || "QR Code")}" width="180" height="180" style="display:block;margin:12px auto 0;border:0;" />
+                ${
+                  options?.qrCaption
+                    ? `<p style="margin:10px 0 0;color:#0B1F14;font-size:16px;font-weight:700;">${escapeHtml(options.qrCaption)}</p>`
+                    : ""
+                }
+                <p style="margin:6px 0 0;color:#8D959D;font-size:12px;line-height:1.45;">Show this code at the entrance. A PNG and a PDF are attached.</p>
+              </td>
+            </tr>
+          </table>`
+      }
       case "footer":
-        return `<p style="margin-top:28px;color:#666;font-size:13px;">${text}<br/>© ${vars.year || new Date().getFullYear()} WASPI. All rights reserved.</p>`
+        return `
+          <p style="margin:26px 0 0;padding-top:16px;border-top:1px solid #E8EAEB;color:#8D959D;font-size:12px;line-height:1.5;text-align:center;">
+            ${text}<br/>© ${vars.year || new Date().getFullYear()} WASPI
+          </p>`
       default:
         return ""
     }
   })
 
+  const banner = options?.bannerSrc
+    ? `<img src="${escapeHtml(options.bannerSrc)}" alt="Event banner" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;" />`
+    : ""
+
   return `
-    <div style="font-family:Arial,sans-serif;background:#F7FBF8;padding:24px;">
-      <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:12px;padding:28px;border:1px solid #E8EAEB;">
-        ${parts.join("\n")}
+    <div style="margin:0;background:#EEF6F1;padding:28px 12px;font-family:Arial,Helvetica,sans-serif;">
+      <div style="max-width:600px;margin:auto;background:#ffffff;border-radius:18px;border:1px solid #D7E5DC;overflow:hidden;">
+        ${banner}
+        <div style="padding:28px 28px 24px;">
+          ${parts.join("\n")}
+        </div>
       </div>
     </div>
   `
@@ -333,7 +372,7 @@ export function renderEmailBlocksHtml(
 export function renderEmailTemplate(
   template: EmailTemplate,
   vars: EmailVars,
-  options?: { qrDataUrl?: string; qrCaption?: string; logoUrl?: string; preview?: boolean },
+  options?: { qrDataUrl?: string; qrCid?: string; qrCaption?: string; bannerSrc?: string; logoUrl?: string; preview?: boolean },
 ) {
   const withYear = { year: String(new Date().getFullYear()), ...vars }
   return {

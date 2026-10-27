@@ -1,8 +1,11 @@
 import { NextResponse } from "next/server"
 import nodemailer from "nodemailer"
-import QRCode from "qrcode"
 import { createClient } from "@supabase/supabase-js"
 import { attendeeDisplayName, buildAttendeeQrValue } from "@/lib/attendee-qr"
+import { buildAttendeeQrMail } from "@/lib/attendee-qr-mail"
+import { buildEventBannerMail } from "@/lib/event-banner-mail"
+import { formatAgendaHtml } from "@/lib/event-agenda"
+import { markAttendeeEmailStatus } from "@/lib/email-status"
 import { renderEmailTemplate, type EmailTemplateKey } from "@/lib/email-templates"
 import { loadEventEmailTemplate } from "@/lib/load-event-email-template"
 
@@ -27,43 +30,6 @@ function isValidEmail(email: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)
 }
 
-function escapeHtml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;")
-}
-
-function formatAgenda(schedules: unknown) {
-  if (!Array.isArray(schedules) || schedules.length === 0) {
-    return "Schedule will be announced at the venue."
-  }
-
-  return schedules
-    .map((day, index) => {
-      const item = day as { date?: string; timeIn?: string; timeOut?: string; coveredTopics?: string[] }
-      const rawDate = String(item?.date || "").slice(0, 10)
-      const dateLabel = rawDate
-        ? new Date(`${rawDate}T12:00:00`).toLocaleDateString(undefined, {
-            weekday: "short",
-            month: "short",
-            day: "numeric",
-            year: "numeric",
-          })
-        : `Day ${index + 1}`
-      const time = [item?.timeIn, item?.timeOut].filter(Boolean).join(" – ")
-      const topics = Array.isArray(item?.coveredTopics)
-        ? item.coveredTopics.map((topic) => String(topic)).filter(Boolean)
-        : []
-
-      return [
-        escapeHtml(dateLabel),
-        time ? escapeHtml(time) : "",
-        topics.length ? `Topics: ${escapeHtml(topics.join(", "))}` : "",
-      ]
-        .filter(Boolean)
-        .join("\n")
-    })
-    .join("\n\n")
-}
-
 export async function POST(req: Request) {
   try {
     const { eventId, attendeeIds, kind } = await req.json()
@@ -86,7 +52,7 @@ export async function POST(req: Request) {
 
     const { data: event, error: eventError } = await supabase
       .from("events")
-      .select("name, venue, schedules")
+      .select("name, venue, schedules, feature_image")
       .eq("id", eventId)
       .single()
 
@@ -106,7 +72,8 @@ export async function POST(req: Request) {
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || req.headers.get("origin") || "http://localhost:3000"
-    const agenda = formatAgenda(event.schedules)
+    const banner = await buildEventBannerMail(event.feature_image)
+    const agenda = formatAgendaHtml(event.schedules)
     const successful: Array<{ id: number; name: string; email: string }> = []
     const failed: Array<{ id: number; name: string; email: string; error: string }> = []
 
@@ -134,10 +101,11 @@ export async function POST(req: Request) {
           name: fullName,
           email: cleanEmail,
         })
-        const qrDataUrl = await QRCode.toDataURL(qrValue, {
-          width: 280,
-          margin: 1,
-          errorCorrectionLevel: "M",
+        const qrMail = await buildAttendeeQrMail({
+          value: qrValue,
+          name: fullName,
+          eventName: event.name || "",
+          referenceId: attendee.reference_id || "",
         })
         const rendered = renderEmailTemplate(
           template,
@@ -150,7 +118,7 @@ export async function POST(req: Request) {
             link,
             agenda,
           },
-          { qrDataUrl, qrCaption: fullName },
+          { qrCid: qrMail.cid, qrCaption: fullName, bannerSrc: banner?.src },
         )
 
         await transporter.sendMail({
@@ -158,6 +126,7 @@ export async function POST(req: Request) {
           to: cleanEmail,
           subject: rendered.subject,
           html: rendered.html,
+          attachments: [...(banner?.attachments || []), ...qrMail.attachments],
         })
 
         successful.push({ id: attendee.id, name: fullName, email: cleanEmail })
@@ -170,6 +139,12 @@ export async function POST(req: Request) {
         })
       }
     }
+
+    await markAttendeeEmailStatus(
+      supabase,
+      successful.map((item) => item.id),
+      kind === "qr" ? "qr_resent" : "event_info",
+    )
 
     return NextResponse.json({
       message: "Email sending finished.",

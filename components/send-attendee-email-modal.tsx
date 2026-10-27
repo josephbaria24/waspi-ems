@@ -7,6 +7,9 @@ import { Checkbox } from "@/components/ui/checkbox"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { supabase } from "@/lib/supabase-client"
+import { EmailStatusTags } from "@/components/email-status-tags"
+import type { EmailStatus } from "@/lib/email-status"
+import { mergeEmailStatus, readLocalEmailStatus, rememberEmailStatus } from "@/lib/email-status"
 
 type Attendee = {
   id: number
@@ -14,6 +17,8 @@ type Attendee = {
   middle_name: string | null
   last_name: string
   email: string
+  hassentevaluation?: boolean
+  email_status?: EmailStatus | null
 }
 
 type SendResult = {
@@ -54,12 +59,29 @@ export default function SendAttendeeEmailModal({
     setResult(null)
     const load = async () => {
       setLoading(true)
-      const { data, error } = await supabase
+      const columns = "id, personal_name, middle_name, last_name, email, hassentevaluation, email_status"
+      let { data, error } = await supabase
         .from("attendees")
-        .select("id, personal_name, middle_name, last_name, email")
+        .select(columns)
         .eq("event_id", eventId)
         .order("last_name", { ascending: true })
-      if (!error) setAttendees(data || [])
+      if (error) {
+        const retry = await supabase
+          .from("attendees")
+          .select("id, personal_name, middle_name, last_name, email, hassentevaluation")
+          .eq("event_id", eventId)
+          .order("last_name", { ascending: true })
+        data = retry.data
+      }
+      const local = readLocalEmailStatus()
+      if (data) {
+        setAttendees(
+          data.map((attendee) => ({
+            ...attendee,
+            email_status: mergeEmailStatus(local[String(attendee.id)], attendee.email_status),
+          })),
+        )
+      }
       setLoading(false)
     }
     load()
@@ -106,6 +128,15 @@ export default function SendAttendeeEmailModal({
       })
       const data = await response.json()
       if (!response.ok) throw new Error(data.error || "Failed to send emails")
+      const sent = new Set((data.result?.successful || []).map((item: { id: number }) => item.id))
+      const patch: EmailStatus = kind === "qr" ? { qr: true, qr_resent: true } : { event_info: true }
+      rememberEmailStatus(Array.from(sent), patch)
+      setAttendees((current) =>
+        current.map((attendee) => {
+          if (!sent.has(attendee.id)) return attendee
+          return { ...attendee, email_status: mergeEmailStatus(attendee.email_status, patch) }
+        }),
+      )
       setResult(data.result || { successful: [], failed: [] })
     } catch (error) {
       alert(error instanceof Error ? error.message : "Failed to send emails")
@@ -153,9 +184,10 @@ export default function SendAttendeeEmailModal({
                   className="flex cursor-pointer items-center gap-3 rounded-lg px-2 py-2 hover:bg-[#F7FBF8]"
                 >
                   <Checkbox checked={selectedIds.has(attendee.id)} onCheckedChange={() => toggleOne(attendee.id)} />
-                  <span className="min-w-0">
+                  <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-medium text-[#1E1E1E]">{name}</span>
                     <span className="block truncate text-xs text-[#8D959D]">{attendee.email}</span>
+                    <EmailStatusTags status={attendee.email_status} evaluated={attendee.hassentevaluation} />
                   </span>
                 </label>
               )

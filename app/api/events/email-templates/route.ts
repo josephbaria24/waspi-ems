@@ -16,7 +16,7 @@ export async function GET(request: Request) {
 
     const { data, error } = await supabaseServer
       .from("events")
-      .select("id, email_templates")
+      .select("id, email_templates, feature_image")
       .eq("id", eventId)
       .maybeSingle()
 
@@ -38,6 +38,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       config: normalizeEmailTemplatesConfig(data.email_templates),
+      featureImage: data.feature_image || "",
     })
   } catch (error) {
     console.error("Get email templates error:", error)

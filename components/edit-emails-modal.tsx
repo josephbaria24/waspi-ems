@@ -36,6 +36,7 @@ import {
   type EmailTemplateKey,
   type EmailTemplatesConfig,
 } from "@/lib/email-templates"
+import { formatAgendaHtml } from "@/lib/event-agenda"
 
 type Props = {
   eventId: number
@@ -69,6 +70,7 @@ export default function EditEmailsModal({ eventId, eventName, open, onClose }: P
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [warning, setWarning] = useState("")
+  const [coverImage, setCoverImage] = useState("")
   const [dragEmailKey, setDragEmailKey] = useState<EmailTemplateKey | null>(null)
   const [dragBlockId, setDragBlockId] = useState<string | null>(null)
 
@@ -85,6 +87,7 @@ export default function EditEmailsModal({ eventId, eventName, open, onClose }: P
         setConfig(next)
         setSelectedKey(next.order[0] || "registration_confirmation")
         if (data.warning) setWarning(data.warning)
+        setCoverImage(typeof data.featureImage === "string" ? data.featureImage : "")
       } catch (error) {
         alert(error instanceof Error ? error.message : "Failed to load email templates")
       } finally {
@@ -110,11 +113,14 @@ export default function EditEmailsModal({ eventId, eventName, open, onClose }: P
         link: "https://waspi.ph/demo",
         eval_link: "https://waspi.ph/evaluation/demo",
         certificate_label: "Participation",
-        agenda: "Day 1 — Oct 27, 2026\n09:00 – 17:00\nTopics: Opening, Workplace safety",
+        agenda: formatAgendaHtml([
+          { date: "2026-12-02", timeIn: "13:00", timeOut: "17:00", coveredTopics: ["HSE"] },
+          { date: "2026-12-03", timeIn: "08:00", timeOut: "17:00", coveredTopics: [] },
+        ]),
       },
-      { preview: true },
+      { preview: true, bannerSrc: coverImage || undefined },
     )
-  }, [selected, eventName])
+  }, [selected, eventName, coverImage])
 
   const updateSelected = (patch: Partial<typeof selected>) => {
     setConfig((prev) => ({

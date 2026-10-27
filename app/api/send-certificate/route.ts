@@ -7,6 +7,8 @@ import fs from "fs/promises";
 import path from "path";
 import { renderEmailTemplate } from "@/lib/email-templates";
 import { loadEventEmailTemplate } from "@/lib/load-event-email-template";
+import { buildEventBannerMail } from "@/lib/event-banner-mail";
+import { markAttendeeEmailStatus } from "@/lib/email-status";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -293,13 +295,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ success: false, error: "Certificate email template is disabled" }, { status: 400 });
     }
 
+    const banner = await buildEventBannerMail(event.feature_image);
     const rendered = renderEmailTemplate(emailTemplate, {
       name: `${attendee.personal_name} ${attendee.last_name}`,
       first_name: attendee.personal_name || "",
       event_name: event.name,
       venue: event.venue || "",
       certificate_label: "Participation",
-    });
+    }, { bannerSrc: banner?.src });
 
     const mailOptions = {
       from: `"${rendered.fromName}" <no-reply@waspi.ph>`,
@@ -307,6 +310,7 @@ export async function POST(req: Request) {
       subject: rendered.subject,
       html: rendered.html,
       attachments: [
+        ...(banner?.attachments || []),
         {
           filename: `Certificate_${fullName.replace(/\s+/g, "_")}.pdf`,
           content: certificatePDF,
@@ -316,6 +320,8 @@ export async function POST(req: Request) {
     };
 
     await transporter.sendMail(mailOptions);
+
+    await markAttendeeEmailStatus(supabase, [attendee.id], "certificate");
 
     console.log(`Certificate sent successfully to: ${email}`);
 

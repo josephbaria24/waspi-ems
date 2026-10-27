@@ -6,6 +6,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Input } from "@/components/ui/input"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { CheckCircle2, XCircle, Loader2, Clock, TrendingUp, Users } from "lucide-react"
+import { EmailStatusTags } from "@/components/email-status-tags"
+import { mergeEmailStatus, readLocalEmailStatus, rememberEmailStatus, type EmailStatus } from "@/lib/email-status"
 
 interface SendEvaluationsModalProps {
   eventId: number
@@ -28,6 +30,7 @@ interface Attendee {
   payment_status?: string
   roles?: string[]
   attendance?: Record<string, boolean> | null
+  email_status?: EmailStatus | null
 }
 
 export default function SendEvaluationsModal({
@@ -49,13 +52,26 @@ export default function SendEvaluationsModal({
     if (!open) return
     const fetchAttendees = async () => {
       setLoading(true)
-      const { data, error } = await supabase
-        .from("attendees")
-        .select(
-          "id, personal_name, last_name, email, hassentevaluation, payment_status, roles, attendance"
+      const columns =
+        "id, personal_name, last_name, email, hassentevaluation, payment_status, roles, attendance, email_status"
+      let { data, error } = await supabase.from("attendees").select(columns).eq("event_id", eventId)
+      if (error) {
+        const retry = await supabase
+          .from("attendees")
+          .select("id, personal_name, last_name, email, hassentevaluation, payment_status, roles, attendance")
+          .eq("event_id", eventId)
+        data = retry.data
+        error = retry.error
+      }
+      if (!error && data) {
+        const local = readLocalEmailStatus()
+        setAttendees(
+          data.map((attendee: Attendee) => ({
+            ...attendee,
+            email_status: mergeEmailStatus(local[String(attendee.id)], attendee.email_status),
+          })),
         )
-        .eq("event_id", eventId)
-      if (!error && data) setAttendees(data)
+      }
       setLoading(false)
     }
     fetchAttendees()
@@ -119,7 +135,18 @@ export default function SendEvaluationsModal({
     const data = await res.json()
     setSending(false)
 
-    if (res.ok) setResult(data.result)
+    if (res.ok) {
+      const sent = (data.result?.successful || []).map((item: { id: number }) => item.id)
+      rememberEmailStatus(sent, { evaluation: true })
+      setAttendees((current) =>
+        current.map((attendee) =>
+          sent.includes(attendee.id)
+            ? { ...attendee, hassentevaluation: true, email_status: mergeEmailStatus(attendee.email_status, { evaluation: true }) }
+            : attendee,
+        ),
+      )
+      setResult(data.result)
+    }
     else alert(`❌ Error: ${data.error || "Failed to send emails."}`)
   }
 
@@ -300,6 +327,7 @@ export default function SendEvaluationsModal({
 
                       <div className="col-span-3 font-medium text-[#1e1b4b]">
                         {a.last_name}, {a.personal_name}
+                        <EmailStatusTags status={a.email_status} evaluated={a.hassentevaluation} />
                       </div>
 
                       <div className="col-span-3 text-sm text-gray-700 truncate">

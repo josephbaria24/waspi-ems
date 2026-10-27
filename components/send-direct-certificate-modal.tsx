@@ -8,6 +8,8 @@ import { Input } from "@/components/ui/input"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Search, Send, Loader2, Award, Trophy, CalendarCheck, Users, Mic, UserCircle, CheckCircle2, XCircle } from "lucide-react"
 import { supabase } from "@/lib/supabase-client"
+import { EmailStatusTags } from "@/components/email-status-tags"
+import { mergeEmailStatus, readLocalEmailStatus, rememberEmailStatus, type EmailStatus } from "@/lib/email-status"
 import { Progress } from "@/components/ui/progress"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 
@@ -20,6 +22,8 @@ interface Attendee {
   reference_id: string
   roles: string[] | null
   attendance: { date: number; status: string }[] | null
+  hassentevaluation?: boolean
+  email_status?: EmailStatus | null
 }
 
 interface SendDirectCertificateModalProps {
@@ -118,14 +122,30 @@ export default function SendDirectCertificateModal({
   const fetchAttendees = async () => {
     setLoading(true)
     try {
-      const { data, error } = await supabase
+      const columns = "id, personal_name, middle_name, last_name, email, reference_id, roles, attendance, hassentevaluation, email_status"
+      let { data, error } = await supabase
         .from("attendees")
-        .select("id, personal_name, middle_name, last_name, email, reference_id, roles, attendance")
+        .select(columns)
         .eq("event_id", eventId)
         .order("last_name", { ascending: true })
+      if (error) {
+        const retry = await supabase
+          .from("attendees")
+          .select("id, personal_name, middle_name, last_name, email, reference_id, roles, attendance")
+          .eq("event_id", eventId)
+          .order("last_name", { ascending: true })
+        data = retry.data
+        error = retry.error
+      }
 
       if (error) throw error
-      setAttendees(data || [])
+      const local = readLocalEmailStatus()
+      setAttendees(
+        (data || []).map((attendee) => ({
+          ...attendee,
+          email_status: mergeEmailStatus(local[String(attendee.id)], attendee.email_status),
+        })),
+      )
     } catch (error) {
       console.error("Error fetching attendees:", error)
       alert("Failed to load attendees")
@@ -234,6 +254,14 @@ export default function SendDirectCertificateModal({
         const data = await response.json()
 
         if (response.ok && data.success) {
+          rememberEmailStatus([attendee.id], { direct_certificate: true })
+          setAttendees((current) =>
+            current.map((item) =>
+              item.id === attendee.id
+                ? { ...item, email_status: mergeEmailStatus(item.email_status, { direct_certificate: true }) }
+                : item,
+            ),
+          )
           results.push({
             name: `${attendee.personal_name} ${attendee.last_name}`,
             email: attendee.email,
@@ -404,6 +432,7 @@ export default function SendDirectCertificateModal({
                       <div className="flex-1 min-w-0">
                         <p className="font-medium truncate">{fullName}</p>
                         <p className="text-sm text-muted-foreground truncate">{attendee.email}</p>
+                        <EmailStatusTags status={attendee.email_status} evaluated={attendee.hassentevaluation} />
                         
                         {/* Roles */}
                         {attendee.roles && Array.isArray(attendee.roles) && attendee.roles.length > 0 && (
