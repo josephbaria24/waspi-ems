@@ -12,6 +12,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Separator } from "@/components/ui/separator"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Loader2, CheckCircle2, Upload, Edit2, X, Crop, UserCog } from "lucide-react"
+import { ConventionForms } from "@/components/convention-forms"
 import { useToast } from "@/hooks/use-toast"
 import { aliasesContainsFilter, eventHasSlug, normalizeRegistrationSlug } from "@/lib/event-slugs"
 import { type MembershipPlan } from "@/lib/membership-settings"
@@ -704,6 +705,7 @@ export default function RegisterPage({ eventRef }: { eventRef?: string }) {
       )}
 
       <Card className="w-full max-w-2xl gap-0 overflow-hidden rounded-3xl border border-[#E8EAEB] bg-white py-0 shadow-sm">
+        <ConventionForms placement="banner" />
         {(event.feature_image || (isAdmin && editMode)) && (
           <div className="relative">
             {event.feature_image ? (

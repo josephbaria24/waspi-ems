@@ -2,6 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { LandingSection } from '@/components/landing-section'
+import { ConventionForms } from '@/components/convention-forms'
 import MagicBento, { type BentoCardProps } from '@/components/MagicBento'
 import ScrollVelocity from '@/components/ScrollVelocity'
 import ScrollFloat from '@/components/ScrollFloat'
@@ -238,6 +239,8 @@ export default async function Home() {
           </BorderGlow>
 
         </section>
+
+        <ConventionForms />
 
         <div
           role="region"
